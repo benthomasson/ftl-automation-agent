@@ -4,11 +4,12 @@ import yaml
 import importlib.resources
 
 
-def create_model(model_id, context=8192):
+def create_model(model_id, context=8192, llm_api_base=None):
 
     return LiteLLMModel(
         model_id=model_id,
         num_ctx=context,
+        api_base=llm_api_base,
     )
 
 

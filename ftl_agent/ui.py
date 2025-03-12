@@ -109,6 +109,8 @@ def launch(context, tool_classes, system_design, **kwargs):
 @click.option("--python", "-o", default="output.py")
 @click.option("--explain", "-o", default="output.txt")
 @click.option("--playbook", default="playbook.yml")
+@click.option("--server-name", default="127.0.0.1")
+@click.option("--llm-api-base", default=None)
 def main(
     tools_files,
     tools,
@@ -120,13 +122,15 @@ def main(
     python,
     explain,
     playbook,
+    server_name,
+    llm_api_base,
 ):
     """A agent that solves a problem given a system design and a set of tools"""
     tool_classes = {}
     tool_classes.update(TOOLS)
     for tf in tools_files:
         tool_classes.update(load_tools(tf))
-    model = create_model(model)
+    model = create_model(model, llm_api_base=llm_api_base)
     state = {
         "inventory": ftl.load_inventory(inventory),
         "modules": modules,
@@ -154,4 +158,4 @@ def main(
         playbook=playbook,
     )
 
-    launch(context, tool_classes, system_design)
+    launch(context, tool_classes, system_design, server_name=server_name)
