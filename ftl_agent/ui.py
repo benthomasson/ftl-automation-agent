@@ -131,6 +131,9 @@ def main(
         "inventory": ftl.load_inventory(inventory),
         "modules": modules,
         "localhost": ftl.localhost,
+        "gate": None,
+        "loop": None,
+        "gate_cache": None,
     }
     for extra_var in extra_vars:
         name, _, value = extra_var.partition("=")

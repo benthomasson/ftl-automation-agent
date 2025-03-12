@@ -13,6 +13,10 @@ from faster_than_light import localhost
 from faster_than_light.gate import build_ftl_gate, use_gate
 from functools import partial
 
+dependencies = [
+"ftl_module_utils @ git+https://github.com/benthomasson/ftl_module_utils@main"
+]
+
 
 class Tools(object):
     def __init__(self, tools: dict[str, Tool]):
@@ -47,6 +51,7 @@ def automation(tools_files, tools, inventory, modules, **kwargs):
                 modules=tool_modules,
                 module_dirs=modules,
                 interpreter="/usr/bin/python3",
+                dependencies=dependencies,
             )
         ),
     }
