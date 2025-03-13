@@ -68,12 +68,12 @@ def bot(context, prompt, messages, system_design, tools):
 
 def launch(context, tool_classes, system_design, **kwargs):
     with gr.Blocks(fill_height=True) as demo:
-        python_code = gr.Code(render=False)
-        playbook_code = gr.Code(render=False)
+        python_code = gr.Code(render=False, label="FTL Automation")
+        playbook_code = gr.Code(render=False, label="Ansible playbook")
         with gr.Row():
             with gr.Column():
                 chatbot = gr.Chatbot(
-                    label="Agent",
+                    label="FTL Agent",
                     type="messages",
                     resizeable=True,
                     scale=1,
