@@ -1,6 +1,6 @@
 from smolagents.tools import Tool
-from ftl_agent.tools import get_json_schema
-from ftl_agent.local_python_executor import FinalAnswerException
+from ftl_automation_agent.tools import get_json_schema
+from ftl_automation_agent.local_python_executor import FinalAnswerException
 
 
 class Complete(Tool):

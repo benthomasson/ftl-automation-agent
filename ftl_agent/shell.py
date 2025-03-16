@@ -16,14 +16,14 @@ from .codegen import (
     generate_playbook_task,
 )
 import faster_than_light as ftl
-from ftl_agent.memory import ActionStep
+from ftl_automation_agent.memory import ActionStep
 from smolagents.agent_types import AgentText
 
 
 class FTLAgentShell(cmd.Cmd):
 
     intro = "Welcome to ftl agent shell"
-    prompt = "(ftl-agent)> "
+    prompt = "(ftl-automation-agent)> "
 
     def __init__(
         self,

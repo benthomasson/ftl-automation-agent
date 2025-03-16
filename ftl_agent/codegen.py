@@ -12,9 +12,9 @@ def generate_python_header(
         if problem:
             f.write(f'Problem:{problem}\n')
         f.write('"""\n')
-        f.write("import ftl_agent\n")
+        f.write("import ftl_automation_agent\n")
         f.write("import os\n\n\n")
-        f.write("with ftl_agent.automation(\n")
+        f.write("with ftl_automation_agent.automation(\n")
         f.write(f"tools_files={tools_files},\n")
         f.write(f"tools={tools},\n")
         f.write(f"inventory='{inventory}',\n")

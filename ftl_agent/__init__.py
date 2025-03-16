@@ -8,7 +8,7 @@ from .tools import load_tools, get_tool
 from .default_tools import TOOLS
 from dataclasses import dataclass
 from faster_than_light import load_inventory
-from ftl_agent.local_python_executor import FinalAnswerException
+from ftl_automation_agent.local_python_executor import FinalAnswerException
 from faster_than_light import localhost
 from faster_than_light.gate import build_ftl_gate, use_gate
 from functools import partial

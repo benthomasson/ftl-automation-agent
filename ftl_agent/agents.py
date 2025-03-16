@@ -42,13 +42,13 @@ from rich.text import Text
 from smolagents.agent_types import AgentAudio, AgentImage, AgentType, handle_agent_output_types
 from smolagents.default_tools import TOOL_MAPPING, FinalAnswerTool
 from smolagents.e2b_executor import E2BExecutor
-from ftl_agent.local_python_executor import (
+from ftl_automation_agent.local_python_executor import (
     BASE_BUILTIN_MODULES,
     LocalPythonInterpreter,
     fix_final_answer_code,
 )
 from smolagents.memory import AgentMemory, PlanningStep, SystemPromptStep, TaskStep, ToolCall
-from ftl_agent.memory import ActionStep
+from ftl_automation_agent.memory import ActionStep
 from smolagents.models import (
     ChatMessage,
     MessageRole,

@@ -15,8 +15,8 @@ from .codegen import (
     generate_playbook_header,
 )
 
-from ftl_agent.util import Bunch
-from ftl_agent.Gradio_UI import stream_to_gradio
+from ftl_automation_agent.util import Bunch
+from ftl_automation_agent.Gradio_UI import stream_to_gradio
 
 
 def bot(context, prompt, messages, system_design, tools):

@@ -16,7 +16,7 @@
 
 #
 # Originally from First_agent_template/Gradio_UI.py.
-# Modifications for ftl-agent
+# Modifications for ftl-automation-agent
 #
 
 
@@ -36,7 +36,7 @@ from smolagents.agent_types import (
     handle_agent_output_types,
 )
 from smolagents.memory import MemoryStep
-from ftl_agent.memory import ActionStep
+from ftl_automation_agent.memory import ActionStep
 
 
 def pull_messages_from_step(

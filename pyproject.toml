@@ -1,5 +1,5 @@
 [project]
-name = "ftl-agent"
+name = "ftl-automation-agent"
 version = "0.1.2"
 dependencies = [
     "smolagents[litellm]==1.9.2",
@@ -9,17 +9,17 @@ dependencies = [
 ]
 
 [tool.setuptools]
-packages = ["ftl_agent", "ftl_agent.prompts"]
+packages = ["ftl_automation_agent", "ftl_automation_agent.prompts"]
 
 [build-system]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project.scripts]
-ftl-agent = "ftl_agent.cli:main"
-ftl-agent-ui = "ftl_agent.ui:main"
-ftl-agent-shell = "ftl_agent.shell:main"
+ftl-automation-agent = "ftl_automation_agent.cli:main"
+ftl-automation-agent-ui = "ftl_automation_agent.ui:main"
+ftl-automation-agent-shell = "ftl_automation_agent.shell:main"
 
 [tool.setuptools.package-data]
-"ftl_agent.prompts" = ["*.yaml"]
+"ftl_automation_agent.prompts" = ["*.yaml"]
 
