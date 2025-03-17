@@ -1,17 +1,19 @@
-from contextlib import contextmanager
-
-from threading import Thread
 import asyncio
-
-from smolagents.tools import Tool
-from .tools import load_tools, get_tool
-from .default_tools import TOOLS
+from contextlib import contextmanager
 from dataclasses import dataclass
-from faster_than_light import load_inventory
-from ftl_automation_agent.local_python_executor import FinalAnswerException
-from faster_than_light import localhost
-from faster_than_light.gate import build_ftl_gate, use_gate
 from functools import partial
+from threading import Thread
+from typing import Dict
+
+from faster_than_light import load_inventory, localhost
+from faster_than_light.gate import build_ftl_gate, use_gate
+from smolagents.tools import Tool
+
+from ftl_automation_agent.local_python_executor import FinalAnswerException
+
+from .default_tools import TOOLS
+from faster_than_light.ref import Ref
+from .tools import get_tool, load_tools
 
 dependencies = [
 "ftl_module_utils @ git+https://github.com/benthomasson/ftl_module_utils@main"
@@ -26,6 +28,8 @@ class Tools(object):
 @dataclass
 class FTL:
     tools: Tools
+    inventory: Dict
+    host: Ref
 
 
 @contextmanager
@@ -59,7 +63,9 @@ def automation(tools_files, tools, inventory, modules, **kwargs):
     for tf in tools_files:
         tool_classes.update(load_tools(tf))
     ftl = FTL(
-        tools=Tools({name: get_tool(tool_classes, name, state) for name in tools})
+        tools=Tools({name: get_tool(tool_classes, name, state) for name in tools}),
+        inventory=inventory,
+        host=Ref(None, "host"),
     )
     try:
         yield ftl
