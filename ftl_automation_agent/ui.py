@@ -135,6 +135,7 @@ def main(
         "inventory": ftl.load_inventory(inventory),
         "modules": modules,
         "localhost": ftl.localhost,
+        "user_input": {},
         "gate": None,
         "loop": None,
         "gate_cache": None,

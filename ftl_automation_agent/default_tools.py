@@ -43,7 +43,47 @@ class Impossible(Tool):
     description, inputs, output_type = get_json_schema(forward)
 
 
+class UserInputTool(Tool):
+    name = "user_input"
+    description = "Asks for user's input on a specific question"
+    inputs = {
+        "question": {"type": "string", "description": "The question to ask the user"}
+    }
+    output_type = "string"
+
+    def __init__(self, state, *args, **kwargs):
+        self.state = state
+        super().__init__(*args, **kwargs)
+
+    def forward(self, question):
+        if question not in self.state["user_input"]:
+            user_input = input(f"{question} => Type your answer here:")
+            self.state["user_input"][question] = user_input
+        return self.state["user_input"][question]
+
+
+class InputTool(Tool):
+    name = "input"
+    description = "Asks for user's input on a specific question"
+    inputs = {
+        "question": {"type": "string", "description": "The question to ask the user"}
+    }
+    output_type = "string"
+
+    def __init__(self, state, *args, **kwargs):
+        self.state = state
+        super().__init__(*args, **kwargs)
+
+    def forward(self, question):
+        if question not in self.state["user_input"]:
+            user_input = input(f"{question} => Type your answer here:")
+            self.state["user_input"][question] = user_input
+        return self.state["user_input"][question]
+
+
 TOOLS = {
     "complete": Complete,
     "impossible": Impossible,
+    "user_input": UserInputTool,
+    "input": InputTool,
 }

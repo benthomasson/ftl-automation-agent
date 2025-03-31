@@ -1,4 +1,5 @@
 import click
+import yaml
 
 from .core import create_model, run_agent
 from .default_tools import TOOLS
@@ -30,6 +31,8 @@ from smolagents.agent_types import AgentText
 @click.option("--output", "-o", default="output.py")
 @click.option("--explain", "-o", default="output.txt")
 @click.option("--playbook", default="playbook.yml")
+@click.option("--info", "-i", multiple=True)
+@click.option("--user-input", default="user_input.yml")
 def main(
     tools,
     tools_files,
@@ -42,6 +45,8 @@ def main(
     output,
     explain,
     playbook,
+    info,
+    user_input,
 ):
     """A agent that solves a problem given a system design and a set of tools"""
     tool_classes = {}
@@ -53,6 +58,10 @@ def main(
         "inventory": ftl.load_inventory(inventory),
         "modules": modules,
         "localhost": ftl.localhost,
+        "user_input": {},
+        "gate": None,
+        "loop": None,
+        "gate_cache": None,
     }
     for extra_var in extra_vars:
         name, _, value = extra_var.partition("=")
@@ -71,20 +80,37 @@ def main(
     generate_explain_header(explain, system_design, problem)
     generate_playbook_header(playbook, system_design, problem)
 
-    for o in run_agent(
-        tools=[get_tool(tool_classes, t, state) for t in tools],
-        model=model,
-        problem_statement=SOLVE_PROBLEM.format(
-            problem=problem, system_design=system_design
-        ),
-    ):
-        if isinstance(o, ActionStep):
-            generate_explain_action_step(explain, o)
-            if o.trace and o.tool_calls:
-                for call in o.tool_calls:
-                    generate_python_tool_call(output, call)
-                generate_playbook_task(playbook, o)
-        elif isinstance(o, AgentText):
-            print(o.to_string())
+    parts = []
 
-    reformat_python(output)
+    if info:
+        parts.append("Use this addition information:")
+
+    for i in info:
+        with open(i) as f:
+            parts.append(f.read())
+
+    prompt = SOLVE_PROBLEM.format(
+                problem=problem, system_design=system_design
+            )
+    if info:
+        prompt = prompt + "\n".join(parts)
+    try:
+        for o in run_agent(
+            tools=[get_tool(tool_classes, t, state) for t in tools],
+            model=model,
+            problem_statement=prompt,
+        ):
+            if isinstance(o, ActionStep):
+                generate_explain_action_step(explain, o)
+                if o.trace and o.tool_calls:
+                    for call in o.tool_calls:
+                        generate_python_tool_call(output, call)
+                    generate_playbook_task(playbook, o)
+            elif isinstance(o, AgentText):
+                print(o.to_string())
+
+    finally:
+        if state['user_input']:
+            with open(user_input, 'w') as f:
+                f.write(yaml.dump(state['user_input']))
+        reformat_python(output)
