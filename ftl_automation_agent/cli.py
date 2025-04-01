@@ -1,5 +1,6 @@
 import click
 import yaml
+import time
 
 from .core import create_model, run_agent
 from .default_tools import TOOLS
@@ -28,11 +29,11 @@ from smolagents.agent_types import AgentText
 @click.option("--modules", "-M", default=['modules'], multiple=True)
 @click.option("--inventory", "-i", default="inventory.yml")
 @click.option("--extra-vars", "-e", multiple=True)
-@click.option("--output", "-o", default="output.py")
-@click.option("--explain", "-o", default="output.txt")
+@click.option("--output", "-o", default="output-{time}.py")
+@click.option("--explain", "-o", default="output-{time}.txt")
 @click.option("--playbook", default="playbook.yml")
 @click.option("--info", "-i", multiple=True)
-@click.option("--user-input", default="user_input.yml")
+@click.option("--user-input", default="user_input-{time}.yml")
 def main(
     tools,
     tools_files,
@@ -48,7 +49,12 @@ def main(
     info,
     user_input,
 ):
+
     """A agent that solves a problem given a system design and a set of tools"""
+    start = time.time()
+    output = output.format(time=start)
+    explain = explain.format(time=start)
+    user_input = user_input.format(time=start)
     tool_classes = {}
     tool_classes.update(TOOLS)
     for tf in tools_files:
@@ -76,6 +82,7 @@ def main(
         inventory,
         modules,
         extra_vars,
+        user_input,
     )
     generate_explain_header(explain, system_design, problem)
     generate_playbook_header(playbook, system_design, problem)

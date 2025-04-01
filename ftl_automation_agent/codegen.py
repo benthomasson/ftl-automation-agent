@@ -3,7 +3,7 @@ import yaml
 
 
 def generate_python_header(
-    output, system_design, problem, tools_files, tools, inventory, modules, extra_vars
+    output, system_design, problem, tools_files, tools, inventory, modules, extra_vars, user_input,
 ):
 
     with open(output, "w") as f:
@@ -19,6 +19,7 @@ def generate_python_header(
         f.write(f"tools={tools},\n")
         f.write(f"inventory='{inventory}',\n")
         f.write(f"modules={modules},\n")
+        f.write(f"user_input='{user_input}',\n")
         for e in extra_vars:
             e, _, _ = e.partition("=")
             f.write(f"{e.lower()} = os.environ['{e.upper()}'],\n")

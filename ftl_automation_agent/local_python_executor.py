@@ -28,6 +28,7 @@ import inspect
 import logging
 import math
 import re
+import traceback
 from collections.abc import Mapping
 from importlib import import_module
 from types import ModuleType
@@ -1383,6 +1384,8 @@ def evaluate_python_code(
         state["_print_outputs"].value = truncate_content(
             str(state["_print_outputs"]), max_length=max_print_outputs_length
         )
+        print(f"Code execution failed at line '{ast.get_source_segment(code, node)}' due to: {type(e).__name__}: {e}")
+        traceback.print_exc()
         raise InterpreterError(
             f"Code execution failed at line '{ast.get_source_segment(code, node)}' due to: {type(e).__name__}: {e}"
         )
