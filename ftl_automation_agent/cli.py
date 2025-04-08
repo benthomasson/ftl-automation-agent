@@ -34,6 +34,7 @@ from smolagents.agent_types import AgentText
 @click.option("--playbook", default="playbook.yml")
 @click.option("--info", "-i", multiple=True)
 @click.option("--user-input", default="user_input-{time}.yml")
+@click.option("--llm-api-base", default=None)
 def main(
     tools,
     tools_files,
@@ -48,6 +49,7 @@ def main(
     playbook,
     info,
     user_input,
+    llm_api_base,
 ):
 
     """A agent that solves a problem given a system design and a set of tools"""
@@ -59,7 +61,7 @@ def main(
     tool_classes.update(TOOLS)
     for tf in tools_files:
         tool_classes.update(load_tools(tf))
-    model = create_model(model)
+    model = create_model(model, llm_api_base=llm_api_base)
     state = {
         "inventory": ftl.load_inventory(inventory),
         "modules": modules,

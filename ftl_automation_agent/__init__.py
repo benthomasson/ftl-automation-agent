@@ -34,7 +34,7 @@ class FTL:
     host: Ref
 
 
-built_in_tools = ["complete", "copy", "user_input", "input"]
+python_tools = ["complete", "copy", "user_input", "input", "linode"]
 
 
 @contextmanager
@@ -46,7 +46,7 @@ def automation(tools_files, tools, inventory, modules, user_input=None, **kwargs
     thread = Thread(target=loop.run_forever, daemon=True)
     thread.start()
     tool_modules = list(tools[:])
-    for tool in built_in_tools:
+    for tool in python_tools:
         if tool in tool_modules:
             tool_modules.remove(tool)
     if user_input is not None:
