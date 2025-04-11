@@ -1,19 +1,20 @@
 import asyncio
+import os
 from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import partial
 from threading import Thread
 from typing import Dict
-import yaml
 
+import yaml
 from faster_than_light import load_inventory, localhost
 from faster_than_light.gate import build_ftl_gate, use_gate
+from faster_than_light.ref import Ref
 from smolagents.tools import Tool
 
 from ftl_automation_agent.local_python_executor import FinalAnswerException
 
 from .default_tools import TOOLS
-from faster_than_light.ref import Ref
 from .tools import get_tool, load_tools
 
 dependencies = [
@@ -54,6 +55,9 @@ def automation(tools_files, tools, inventory, modules, user_input=None, **kwargs
             user_input = yaml.safe_load(f.read())
     else:
         user_input = {}
+    if not os.path.exists(inventory):
+        with open(inventory, "w") as f:
+            f.write(yaml.dump({}))
     state = {
         "inventory": load_inventory(inventory),
         "modules": modules,
