@@ -195,12 +195,19 @@ def get_json_schema(func: Callable) -> Dict:
     )
 
 
-def load_tools(tools_file):
+def load_tools(tools_file_or_module_name):
 
-    # Load module from file path
-    spec = importlib.util.spec_from_file_location("tools", tools_file)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    if tools_file_or_module_name.endswith(".py"):
+
+        tools_file = tools_file_or_module_name
+        # Load module from file path
+        spec = importlib.util.spec_from_file_location("tools", tools_file)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+    else:
+
+        module_name = tools_file_or_module_name
+        module = importlib.import_module(module_name)
 
     tool_classes = {}
 

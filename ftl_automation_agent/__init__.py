@@ -35,21 +35,21 @@ class FTL:
     host: Ref
 
 
-python_tools = ["complete", "copy", "user_input", "input", "linode"]
-
-
 @contextmanager
 def automation(tools_files, tools, inventory, modules, user_input=None, **kwargs):
     tool_classes = {}
     tool_classes.update(TOOLS)
+    for tf in tools_files:
+        tool_classes.update(load_tools(tf))
     gate_cache = {}
     loop = asyncio.new_event_loop()
     thread = Thread(target=loop.run_forever, daemon=True)
     thread.start()
-    tool_modules = list(tools[:])
-    for tool in python_tools:
-        if tool in tool_modules:
-            tool_modules.remove(tool)
+    tool_modules = []
+    for tool in tool_classes.values():
+        if hasattr(tool, "module"):
+            if module := getattr(tool, "module"):
+                tool_modules.append(module)
     if user_input is not None:
         with open(user_input) as f:
             user_input = yaml.safe_load(f.read())
@@ -71,13 +71,11 @@ def automation(tools_files, tools, inventory, modules, user_input=None, **kwargs
                 module_dirs=modules,
                 interpreter="/usr/bin/python3",
                 dependencies=dependencies,
-            )
+            ),
         ),
         "user_input": user_input,
     }
     state.update(kwargs)
-    for tf in tools_files:
-        tool_classes.update(load_tools(tf))
     ftl = FTL(
         tools=Tools({name: get_tool(tool_classes, name, state) for name in tools}),
         inventory=inventory,
