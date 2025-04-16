@@ -5,6 +5,7 @@ from ftl_automation_agent.local_python_executor import FinalAnswerException
 
 class Complete(Tool):
     name = "complete"
+    module = None
 
     def __init__(self, state, *args, **kwargs):
         self.state = state
@@ -25,6 +26,7 @@ class Complete(Tool):
 
 class Impossible(Tool):
     name = "impossible"
+    module = None
 
     def __init__(self, state, *args, **kwargs):
         self.state = state
@@ -50,6 +52,7 @@ class UserInputTool(Tool):
         "question": {"type": "string", "description": "The question to ask the user"}
     }
     output_type = "string"
+    module = None
 
     def __init__(self, state, *args, **kwargs):
         self.state = state
@@ -69,6 +72,7 @@ class InputTool(Tool):
         "question": {"type": "string", "description": "The question to ask the user"}
     }
     output_type = "string"
+    module = None
 
     def __init__(self, state, *args, **kwargs):
         self.state = state
