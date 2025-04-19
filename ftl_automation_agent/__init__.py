@@ -17,6 +17,11 @@ from ftl_automation_agent.local_python_executor import FinalAnswerException
 from .default_tools import TOOLS
 from .tools import get_tool, load_tools
 
+from rich.progress import Progress, TextColumn, BarColumn, TaskProgressColumn, TimeElapsedColumn
+from textual.widgets import RichLog
+from rich.console import Console
+console = Console()
+
 dependencies = [
     "ftl_module_utils @ git+https://github.com/benthomasson/ftl_module_utils@main",
     "ftl_collections @ git+https://github.com/benthomasson/ftl-collections@main",
@@ -33,18 +38,24 @@ class FTL:
     tools: Tools
     inventory: Dict
     host: Ref
+    console: Console
+    progress: Progress
+    log: RichLog
 
 
 @contextmanager
-def automation(tools_files, tools, inventory, modules, user_input=None, **kwargs):
+def automation(tools_files, tools, inventory, modules, user_input=None, log=None, sync=True, **kwargs):
     tool_classes = {}
     tool_classes.update(TOOLS)
     for tf in tools_files:
         tool_classes.update(load_tools(tf))
     gate_cache = {}
-    loop = asyncio.new_event_loop()
-    thread = Thread(target=loop.run_forever, daemon=True)
-    thread.start()
+    if sync:
+        loop = asyncio.new_event_loop()
+        thread = Thread(target=loop.run_forever, daemon=True)
+        thread.start()
+    else:
+        loop = None
     tool_modules = []
     for tool in tool_classes.values():
         if hasattr(tool, "module"):
@@ -74,14 +85,27 @@ def automation(tools_files, tools, inventory, modules, user_input=None, **kwargs
             ),
         ),
         "user_input": user_input,
+        "log": log,
+        "console": console,
     }
     state.update(kwargs)
-    ftl = FTL(
-        tools=Tools({name: get_tool(tool_classes, name, state) for name in tools}),
-        inventory=inventory,
-        host=Ref(None, "host"),
-    )
-    try:
-        yield ftl
-    except FinalAnswerException as e:
-        print(e)
+
+    with Progress(
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            TimeElapsedColumn(),
+    ) as progress:
+        ftl = FTL(
+            tools=Tools({name: get_tool(tool_classes, name, state) for name in tools}),
+            inventory=inventory,
+            host=Ref(None, "host"),
+            console=console,
+            progress=progress,
+            log=log,
+        )
+        try:
+            yield ftl
+        except FinalAnswerException as e:
+            console.print(e)
+
