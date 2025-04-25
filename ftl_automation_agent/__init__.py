@@ -41,6 +41,7 @@ class FTL:
     console: Console
     progress: Progress
     log: RichLog
+    state: Dict
 
 
 @contextmanager
@@ -103,6 +104,7 @@ def automation(tools_files, tools, inventory, modules, user_input=None, log=None
             console=console,
             progress=progress,
             log=log,
+            state=state,
         )
         try:
             yield ftl
