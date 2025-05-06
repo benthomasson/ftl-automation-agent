@@ -18,6 +18,8 @@ from .codegen import (
 import faster_than_light as ftl
 from ftl_automation_agent.memory import ActionStep
 from smolagents.agent_types import AgentText
+from rich.console import Console
+console = Console()
 
 
 @click.command()
@@ -70,6 +72,8 @@ def main(
         "gate": None,
         "loop": None,
         "gate_cache": None,
+        "log": None,
+        "console": console,
     }
     for extra_var in extra_vars:
         name, _, value = extra_var.partition("=")
