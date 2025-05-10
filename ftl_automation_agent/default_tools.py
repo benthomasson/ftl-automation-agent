@@ -46,7 +46,7 @@ class Impossible(Tool):
 
 
 class UserInputTool(Tool):
-    name = "user_input"
+    name = "user_input_tool"
     description = "Asks for user's input on a specific question"
     inputs = {
         "question": {"type": "string", "description": "The question to ask the user"}
@@ -66,7 +66,7 @@ class UserInputTool(Tool):
 
 
 class InputTool(Tool):
-    name = "input"
+    name = "input_tool"
     description = "Asks for user's input on a specific question"
     inputs = {
         "question": {"type": "string", "description": "The question to ask the user"}
@@ -88,6 +88,6 @@ class InputTool(Tool):
 TOOLS = {
     "complete": Complete,
     "impossible": Impossible,
-    "user_input": UserInputTool,
-    "input": InputTool,
+    "user_input_tool": UserInputTool,
+    "input_tool": InputTool,
 }

@@ -58,7 +58,9 @@ def automation(tools_files, tools, inventory, modules, user_input=None, log=None
     else:
         loop = None
     tool_modules = []
-    for tool in tool_classes.values():
+    for tool_name, tool in tool_classes.items():
+        if tool_name not in tools:
+            continue
         if hasattr(tool, "module"):
             if module := getattr(tool, "module"):
                 tool_modules.append(module)
@@ -110,4 +112,3 @@ def automation(tools_files, tools, inventory, modules, user_input=None, log=None
             yield ftl
         except FinalAnswerException as e:
             console.print(e)
-
