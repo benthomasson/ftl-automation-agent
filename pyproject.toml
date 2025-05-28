@@ -6,6 +6,7 @@ dependencies = [
     "faster_than_light",
     "gradio",
     "black",
+    "textual",
 ]
 
 [tool.setuptools]
