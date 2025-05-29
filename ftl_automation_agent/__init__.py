@@ -81,7 +81,7 @@ def automation(tools_files, tools, inventory, modules, user_input=None, log=None
 
     state = {
         "inventory": load_inventory(inventory),
-        "modules": modules,
+        "modules": modules_resolved,
         "localhost": localhost,
         "gate_cache": gate_cache,
         "loop": loop,
@@ -89,7 +89,7 @@ def automation(tools_files, tools, inventory, modules, user_input=None, log=None
             use_gate,
             *build_ftl_gate(
                 modules=tool_modules,
-                module_dirs=modules,
+                module_dirs=modules_resolved,
                 interpreter="/usr/bin/python3",
                 dependencies=dependencies,
             ),
