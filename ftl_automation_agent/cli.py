@@ -20,6 +20,7 @@ from .core import create_model, run_agent
 from .default_tools import TOOLS
 from .prompts import SOLVE_PROBLEM
 from .tools import get_tool, load_tools
+from .util import resolve_modules_path_or_package
 
 
 import logging
@@ -80,9 +81,14 @@ def main(
     loop = asyncio.new_event_loop()
     thread = Thread(target=loop.run_forever, daemon=True)
     thread.start()
+    modules_resolved = []
+    for modules_path_or_package in modules:
+        modules_path = resolve_modules_path_or_package(modules_path_or_package)
+        modules_resolved.append(modules_path)
+
     state = {
         "inventory": ftl.load_inventory(inventory),
-        "modules": modules,
+        "modules": modules_resolved,
         "localhost": ftl.localhost,
         "user_input": {},
         "gate": None,
