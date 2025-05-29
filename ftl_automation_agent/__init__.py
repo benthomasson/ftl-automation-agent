@@ -16,6 +16,7 @@ from ftl_automation_agent.local_python_executor import FinalAnswerException
 
 from .default_tools import TOOLS
 from .tools import get_tool, load_tools
+from .util import resolve_modules_path_or_package
 
 from rich.progress import Progress, TextColumn, BarColumn, TaskProgressColumn, TimeElapsedColumn
 from textual.widgets import RichLog
@@ -72,6 +73,12 @@ def automation(tools_files, tools, inventory, modules, user_input=None, log=None
     if not os.path.exists(inventory):
         with open(inventory, "w") as f:
             f.write(yaml.dump({}))
+
+    modules_resolved = []
+    for modules_path_or_package in modules:
+        modules_path = resolve_modules_path_or_package(modules_path_or_package)
+        modules_resolved.append(modules_path)
+
     state = {
         "inventory": load_inventory(inventory),
         "modules": modules,
