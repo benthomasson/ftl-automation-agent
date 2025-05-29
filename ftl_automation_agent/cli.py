@@ -22,11 +22,6 @@ from .prompts import SOLVE_PROBLEM
 from .tools import get_tool, load_tools
 from .util import resolve_modules_path_or_package
 
-
-import logging
-
-logging.basicConfig(level=logging.INFO)
-
 console = Console()
 
 
@@ -158,4 +153,5 @@ def main(
         if state['user_input']:
             with open(user_input, 'w') as f:
                 f.write(yaml.dump(state['user_input']))
+            print(f"Wrote {user_input}")
         reformat_python(output)

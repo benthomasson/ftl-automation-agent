@@ -10,6 +10,7 @@ def create_model(model_id, context=8192, llm_api_base=None):
         model_id=model_id,
         num_ctx=context,
         api_base=llm_api_base,
+        temperature=0,
     )
 
 
@@ -22,6 +23,7 @@ def make_agent(tools, model):
         model=model,
         verbosity_level=4,
         prompt_templates=prompt_templates,
+        max_steps=10,
     )
     return agent
 

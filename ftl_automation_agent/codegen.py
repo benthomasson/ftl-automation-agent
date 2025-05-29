@@ -65,7 +65,8 @@ def generate_python_tool_call(o, output, call):
 def generate_python_step_footer(output, o):
     with open(output, "a") as f:
         if o.error:
-            f.write(f"\n    # {o.error.__class__.__name__}: {o.error.message}")
+            error_message = "\n # ".join(o.error.message.split("\n"))
+            f.write(f"\n    # {o.error.__class__.__name__}: {error_message}")
         f.write("\n    # " + "-" * 80)
 
 
