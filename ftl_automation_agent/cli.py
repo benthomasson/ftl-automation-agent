@@ -154,4 +154,8 @@ def main(
             with open(user_input, 'w') as f:
                 f.write(yaml.dump(state['user_input']))
             print(f"Wrote {user_input}")
+        else:
+            with open(user_input, 'w') as f:
+                f.write(yaml.dump({}))
+            print(f"Wrote {user_input}")
         reformat_python(output)
