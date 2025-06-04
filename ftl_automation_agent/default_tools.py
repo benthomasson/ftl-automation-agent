@@ -2,6 +2,8 @@ from smolagents.tools import Tool
 from ftl_automation_agent.tools import get_json_schema
 from ftl_automation_agent.local_python_executor import FinalAnswerException
 
+from rich.prompt import Prompt
+
 
 class Complete(Tool):
     name = "complete"
@@ -60,7 +62,7 @@ class UserInputTool(Tool):
 
     def forward(self, question):
         if question not in self.state["user_input"]:
-            user_input = input(f"{question} => Type your answer here:")
+            user_input = Prompt.ask(f"{question} => Type your answer here:")
             self.state["user_input"][question] = user_input
         return self.state["user_input"][question]
 
@@ -80,7 +82,7 @@ class InputTool(Tool):
 
     def forward(self, question):
         if question not in self.state["user_input"]:
-            user_input = input(f"{question} => Type your answer here:")
+            user_input = Prompt.ask(f"{question} => Type your answer here:")
             self.state["user_input"][question] = user_input
         return self.state["user_input"][question]
 
