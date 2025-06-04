@@ -1,3 +1,8 @@
+import asyncio
+import os
+import time
+from threading import Thread
+
 import click
 
 from .core import create_model, make_agent
@@ -6,6 +11,9 @@ from .tools import get_tool, load_tools
 import faster_than_light as ftl
 import gradio as gr
 from functools import partial
+import os
+import yaml
+from rich.console import Console
 
 from .codegen import (
     generate_python_header,
@@ -15,8 +23,15 @@ from .codegen import (
     generate_playbook_header,
 )
 
+from .util import resolve_modules_path_or_package
+
+console = Console()
+
 from ftl_automation_agent.util import Bunch
 from ftl_automation_agent.Gradio_UI import stream_to_gradio
+
+#import logging
+#logging.basicConfig(level=logging.DEBUG)
 
 
 def bot(context, prompt, messages, system_design, tools):
@@ -25,7 +40,7 @@ def bot(context, prompt, messages, system_design, tools):
         model=context.model,
     )
     generate_python_header(
-        context.python,
+        context.output,
         system_design,
         prompt,
         context.tools_files,
@@ -33,13 +48,14 @@ def bot(context, prompt, messages, system_design, tools):
         context.inventory,
         context.modules,
         context.extra_vars,
+        context.user_input,
     )
     generate_explain_header(context.explain, system_design, prompt)
     generate_playbook_header(context.playbook, system_design, prompt)
 
     def update_code():
         nonlocal python_output, playbook_output
-        with open(context.python) as f:
+        with open(context.output) as f:
             python_output = f.read()
         with open(context.playbook) as f:
             playbook_output = f.read()
@@ -60,9 +76,18 @@ def bot(context, prompt, messages, system_design, tools):
         messages.append(msg)
         yield messages, python_output, playbook_output
 
-    reformat_python(context.python)
+    if context.state['user_input']:
+        with open(context.user_input, 'w') as f:
+            f.write(yaml.dump(context.state['user_input']))
+        print(f"Wrote {context.user_input}")
+    else:
+        with open(context.user_input, 'w') as f:
+            f.write(yaml.dump({}))
+        print(f"Wrote {context.user_input}")
+    reformat_python(context.output)
     add_lookup_plugins(context.playbook)
     update_code()
+
     yield messages, python_output, playbook_output
 
 
@@ -99,46 +124,67 @@ def launch(context, tool_classes, system_design, **kwargs):
 
 
 @click.command()
+@click.option("--tools", "-t", multiple=True)
 @click.option("--tools-files", "-f", multiple=True)
 @click.option("--tools", "-t", multiple=True)
 @click.option("--system-design", "-s")
 @click.option("--model", "-m", default="ollama_chat/deepseek-r1:14b")
-@click.option("--inventory", "-i", default="inventory.yml")
 @click.option("--modules", "-M", default=["modules"], multiple=True)
+@click.option("--inventory", "-i", default="inventory.yml")
 @click.option("--extra-vars", "-e", multiple=True)
-@click.option("--python", "-o", default="output.py")
-@click.option("--explain", "-o", default="output.txt")
-@click.option("--playbook", default="playbook.yml")
+@click.option("--output", default="output-{time}.py")
+@click.option("--explain", default="output-{time}.txt")
+@click.option("--playbook", default="playbook-{time}.yml")
+@click.option("--info", multiple=True)
+@click.option("--user-input", default="user_input-{time}.yml")
 @click.option("--server-name", default="127.0.0.1")
 @click.option("--llm-api-base", default=None)
 def main(
-    tools_files,
     tools,
+    tools_files,
     system_design,
     model,
-    inventory,
     modules,
+    inventory,
     extra_vars,
-    python,
+    output,
     explain,
     playbook,
+    info,
+    user_input,
     server_name,
     llm_api_base,
 ):
     """A agent that solves a problem given a system design and a set of tools"""
+    start = time.time()
+    output = output.format(time=start)
+    explain = explain.format(time=start)
+    user_input = user_input.format(time=start)
+    playbook = playbook.format(time=start)
+
     tool_classes = {}
     tool_classes.update(TOOLS)
     for tf in tools_files:
         tool_classes.update(load_tools(tf))
     model = create_model(model, llm_api_base=llm_api_base)
+    if not os.path.exists(inventory):
+        with open(inventory, "w") as f:
+            f.write(yaml.dump({}))
+    modules_resolved = []
+    for modules_path_or_package in modules:
+        modules_path = resolve_modules_path_or_package(modules_path_or_package)
+        modules_resolved.append(modules_path)
+
     state = {
         "inventory": ftl.load_inventory(inventory),
-        "modules": modules,
+        "modules": modules_resolved,
         "localhost": ftl.localhost,
         "user_input": {},
         "gate": None,
         "loop": None,
         "gate_cache": None,
+        "log": None,
+        "console": console,
     }
     for extra_var in extra_vars:
         name, _, value = extra_var.partition("=")
@@ -152,11 +198,12 @@ def main(
         system_design=system_design,
         model=model,
         inventory=inventory,
-        modules=modules,
+        modules=modules_resolved,
         extra_vars=extra_vars,
-        python=python,
+        output=output,
         explain=explain,
         playbook=playbook,
+        user_input=user_input,
     )
 
     launch(context, tool_classes, system_design, server_name=server_name)
