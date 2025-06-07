@@ -98,6 +98,11 @@ def launch(context, tool_classes, system_design, **kwargs):
         playbook_code = gr.Code(render=False, label="Ansible playbook")
         with gr.Row():
             with gr.Column():
+                system_design_field = gr.Textbox(system_design, label="System Design", render=False)
+                tool_check_boxes = gr.CheckboxGroup(
+                    choices=sorted(tool_classes), label="Tools", render=False
+                )
+
                 chatbot = gr.Chatbot(
                     label="FTL Agent",
                     type="messages",
@@ -109,11 +114,10 @@ def launch(context, tool_classes, system_design, **kwargs):
                     type="messages",
                     chatbot=chatbot,
                     additional_inputs=[
-                        gr.Textbox(system_design, label="System Design"),
-                        gr.CheckboxGroup(
-                            choices=sorted(tool_classes), label="Tools"
-                        ),
+                        system_design_field,
+                        tool_check_boxes,
                     ],
+                    additional_inputs_accordion=gr.Accordion(label="Additional Inputs", open=False, render=False),
                     additional_outputs=[python_code, playbook_code],
                 )
 
@@ -150,7 +154,6 @@ def launch(context, tool_classes, system_design, **kwargs):
                         )
 
                 def update_questions():
-                    print('update_questions')
                     return context.state["questions"]
 
                 gr.Timer(1).tick(fn=update_questions, outputs=current_question_input)
