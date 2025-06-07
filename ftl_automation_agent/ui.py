@@ -93,6 +93,41 @@ def bot(context, prompt, messages, system_design, tools):
 
 def launch(context, tool_classes, system_design, **kwargs):
     with gr.Blocks(fill_height=True) as demo:
+        current_question_input = gr.Textbox(visible=False)
+
+        @gr.render(inputs=current_question_input)
+        def render_form(*args, **kwargs):
+            print('render_form')
+            print(args)
+            print(kwargs)
+            print(context.state['questions'])
+            print(context.state['user_input'])
+            gr.Markdown("### Please answer the following questions:")
+            inputs = []
+            for q in context.state["questions"]:
+                if q in context.state["user_input"]:
+                    inputs.append(gr.Textbox(label=q, value=context.state["user_input"][q], interactive=False))
+                else:
+                    inputs.append(gr.Textbox(label=q, ))
+            answer_button = gr.Button("Submit")
+
+            def answer_questions(*args, **kwargs):
+                print(args)
+                print(kwargs)
+                for question, answer in zip(context.state["questions"], args):
+                    context.state["user_input"][question] = answer
+
+            answer_button.click(
+                answer_questions,
+                inputs = inputs
+            )
+
+        def update_questions():
+            print('update_questions')
+            return context.state["questions"]
+
+        gr.Timer(1).tick(fn=update_questions, outputs=current_question_input)
+
         python_code = gr.Code(render=False, label="FTL Automation")
         playbook_code = gr.Code(render=False, label="Ansible playbook")
         with gr.Row():
@@ -185,6 +220,7 @@ def main(
         "gate_cache": None,
         "log": None,
         "console": console,
+        "questions": [],
     }
     for extra_var in extra_vars:
         name, _, value = extra_var.partition("=")
