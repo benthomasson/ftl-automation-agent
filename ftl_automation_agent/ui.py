@@ -33,8 +33,28 @@ from ftl_automation_agent.Gradio_UI import stream_to_gradio
 #import logging
 #logging.basicConfig(level=logging.DEBUG)
 
+TASK_PROMPT = """
+
+Use the user_input_tool to ask for additional information.
+Use the complete() tool to signal that you are done
+
+Do not use example data, ask the user for input using user_input_tool().
+Do not import the `os` package.
+Do not import the `socket` package.
+Do not use the open function.
+Only use the tools provided.
+Do not assume input values to the tools.  Ask the user.
+Do not assume that the sudo group exists.  Ask the user which group to use.
+
+
+This is a real scenario.  Use the tools provided or ask for assistance.
+
+"""
+
 
 def bot(context, prompt, messages, system_design, tools):
+
+    full_prompt = TASK_PROMPT + prompt
     agent = make_agent(
         tools=[get_tool(context.tool_classes, t, context.state) for t in tools],
         model=context.model,
@@ -42,7 +62,7 @@ def bot(context, prompt, messages, system_design, tools):
     generate_python_header(
         context.output,
         system_design,
-        prompt,
+        full_prompt,
         context.tools_files,
         tools,
         context.inventory,
@@ -50,8 +70,8 @@ def bot(context, prompt, messages, system_design, tools):
         context.extra_vars,
         context.user_input,
     )
-    generate_explain_header(context.explain, system_design, prompt)
-    generate_playbook_header(context.playbook, system_design, prompt)
+    generate_explain_header(context.explain, system_design, full_prompt)
+    generate_playbook_header(context.playbook, system_design, full_prompt)
 
     def update_code():
         nonlocal python_output, playbook_output
@@ -67,10 +87,10 @@ def bot(context, prompt, messages, system_design, tools):
 
     # chat interface only needs the latest messages yielded
     messages = []
-    messages.append(gr.ChatMessage(role="user", content=prompt))
+    messages.append(gr.ChatMessage(role="user", content=full_prompt))
     yield messages, python_output, playbook_output
     for msg in stream_to_gradio(
-        agent, context, task=prompt, reset_agent_memory=False
+        agent, context, task=full_prompt, reset_agent_memory=False
     ):
         update_code()
         messages.append(msg)
