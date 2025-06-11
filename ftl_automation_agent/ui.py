@@ -39,12 +39,12 @@ Use the user_input_tool to ask for additional information.
 Use the complete() tool to signal that you are done
 
 Do not use example data, ask the user for input using user_input_tool().
+Do not ask for root passwords, user tokens, API keys, or secrets.  They will be provided to the tools directly.
 Do not import the `os` package.
 Do not import the `socket` package.
 Do not use the open function.
 Only use the tools provided.
 Do not assume input values to the tools.  Ask the user.
-Do not assume that the sudo group exists.  Ask the user which group to use.
 
 
 This is a real scenario.  Use the tools provided or ask for assistance.
@@ -62,7 +62,7 @@ def bot(context, prompt, messages, system_design, tools):
     generate_python_header(
         context.output,
         system_design,
-        full_prompt,
+        prompt,
         context.tools_files,
         tools,
         context.inventory,
@@ -71,7 +71,7 @@ def bot(context, prompt, messages, system_design, tools):
         context.user_input,
     )
     generate_explain_header(context.explain, system_design, full_prompt)
-    generate_playbook_header(context.playbook, system_design, full_prompt)
+    generate_playbook_header(context.playbook, system_design, prompt)
 
     def update_code():
         nonlocal python_output, playbook_output
