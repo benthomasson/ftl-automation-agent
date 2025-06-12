@@ -1,7 +1,5 @@
-import asyncio
 import os
 import time
-from threading import Thread
 
 import click
 
@@ -11,7 +9,6 @@ from .tools import get_tool, load_tools
 import faster_than_light as ftl
 import gradio as gr
 from functools import partial
-import os
 import yaml
 from rich.console import Console
 
@@ -25,13 +22,11 @@ from .codegen import (
 
 from .util import resolve_modules_path_or_package
 
-console = Console()
-
 from ftl_automation_agent.util import Bunch
 from ftl_automation_agent.Gradio_UI import stream_to_gradio
 
-#import logging
-#logging.basicConfig(level=logging.DEBUG)
+console = Console()
+
 
 TASK_PROMPT = """
 
@@ -174,7 +169,7 @@ def launch(context, tool_classes, system_design, **kwargs):
 
                         answer_button.click(
                             answer_questions,
-                            inputs = inputs
+                            inputs=inputs
                         )
 
                 def update_questions():
@@ -182,8 +177,8 @@ def launch(context, tool_classes, system_design, **kwargs):
 
                 gr.Timer(1).tick(fn=update_questions, outputs=current_question_input)
 
-                #python_code.render()
-                #playbook_code.render()
+                # python_code.render()
+                # playbook_code.render()
 
         demo.launch(debug=True, **kwargs)
 
@@ -193,6 +188,7 @@ def launch(context, tool_classes, system_design, **kwargs):
 @click.option("--tools-files", "-f", multiple=True)
 @click.option("--tools", "-t", multiple=True)
 @click.option("--problem", "-p", default=None)
+@click.option("--problem-file", "-pf", default=None)
 @click.option("--system-design", "-s")
 @click.option("--model", "-m", default="ollama_chat/deepseek-r1:14b")
 @click.option("--modules", "-M", default=["modules"], multiple=True)
@@ -209,6 +205,7 @@ def main(
     tools,
     tools_files,
     problem,
+    problem_file,
     system_design,
     model,
     modules,
@@ -257,6 +254,12 @@ def main(
     for extra_var in extra_vars:
         name, _, value = extra_var.partition("=")
         state[name] = value
+
+    if problem_file is not None and problem is not None:
+        raise Exception('problem and problem-file are mutually exclusive options')
+    elif problem_file is not None and problem is None:
+        with open(problem_file) as f:
+            problem = f.read()
 
     context = Bunch(
         tool_classes=tool_classes,
