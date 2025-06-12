@@ -30,10 +30,10 @@ console = Console()
 
 TASK_PROMPT = """
 
-Use the user_input_tool to ask for additional information.
+Use the gradio_input_tool to ask for additional information.
 Use the complete() tool to signal that you are done
 
-Do not use example data, ask the user for input using user_input_tool().
+Do not use example data, ask the user for input using gradio_input_tool().
 Do not ask for root passwords, user tokens, API keys, or secrets.  They will be provided to the tools directly.
 Do not import the `os` package.
 Do not import the `socket` package.
