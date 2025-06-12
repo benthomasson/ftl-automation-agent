@@ -54,6 +54,9 @@ This is a real scenario.  Use the tools provided or ask for assistance.
 
 def bot(context, prompt, messages, system_design, tools):
 
+    if isinstance(prompt, dict):
+        prompt = prompt['text']
+
     full_prompt = TASK_PROMPT + prompt
     agent = make_agent(
         tools=[get_tool(context.tool_classes, t, context.state) for t in tools],
@@ -120,7 +123,7 @@ def launch(context, tool_classes, system_design, **kwargs):
             with gr.Column():
                 system_design_field = gr.Textbox(system_design, label="System Design", render=False)
                 tool_check_boxes = gr.CheckboxGroup(
-                    choices=sorted(tool_classes), label="Tools", render=False
+                    choices=sorted(tool_classes), value=sorted(context.tools), label="Tools", render=False
                 )
 
                 chatbot = gr.Chatbot(
@@ -139,6 +142,7 @@ def launch(context, tool_classes, system_design, **kwargs):
                     ],
                     additional_inputs_accordion=gr.Accordion(label="Additional Inputs", open=False, render=False),
                     additional_outputs=[python_code, playbook_code],
+                    textbox=gr.MultimodalTextbox(file_types=['text_encoded'], value=context.problem),
                 )
 
             with gr.Column():
@@ -188,6 +192,7 @@ def launch(context, tool_classes, system_design, **kwargs):
 @click.option("--tools", "-t", multiple=True)
 @click.option("--tools-files", "-f", multiple=True)
 @click.option("--tools", "-t", multiple=True)
+@click.option("--problem", "-p", default=None)
 @click.option("--system-design", "-s")
 @click.option("--model", "-m", default="ollama_chat/deepseek-r1:14b")
 @click.option("--modules", "-M", default=["modules"], multiple=True)
@@ -203,6 +208,7 @@ def launch(context, tool_classes, system_design, **kwargs):
 def main(
     tools,
     tools_files,
+    problem,
     system_design,
     model,
     modules,
@@ -257,6 +263,7 @@ def main(
         state=state,
         tools_files=tools_files,
         tools=tools,
+        problem=problem,
         system_design=system_design,
         model=model,
         inventory=inventory,
