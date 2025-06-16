@@ -8,6 +8,7 @@ dependencies = [
     "black",
     "textual",
     "rich",
+    "itsdangerous",
 ]
 
 [tool.setuptools]
@@ -21,6 +22,7 @@ build-backend = "setuptools.build_meta"
 ftl-automation-agent = "ftl_automation_agent.cli:main"
 ftl-automation-agent-ui = "ftl_automation_agent.ui:main"
 ftl-automation-agent-shell = "ftl_automation_agent.shell:main"
+ftl-automation-agent-app = "ftl_automation_agent.app:main"
 
 [tool.setuptools.package-data]
 "ftl_automation_agent.prompts" = ["*.yaml"]
