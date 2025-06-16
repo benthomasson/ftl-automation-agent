@@ -187,16 +187,11 @@ def launch(context, tool_classes, system_design, **kwargs):
     def greet(request: gr.Request):
         return f"Welcome to Gradio, {request.username}"
 
-    with gr.Blocks() as main_demo:
+    with gr.Blocks(fill_height=True) as demo:
+
         m = gr.Markdown("Welcome to Gradio!")
         gr.Button("Logout", link="/logout")
-        main_demo.load(greet, None, m)
-
-    app = gr.mount_gradio_app(app, main_demo, path="/gradio", auth_dependency=get_user)
-
-    uvicorn.run(app, host="0.0.0.0", port=7860)
-
-    with gr.Blocks(fill_height=True) as demo:
+        demo.load(greet, None, m)
 
         python_code = gr.Code(render=False, label="FTL Automation")
         playbook_code = gr.Code(render=False, label="Ansible playbook")
@@ -284,7 +279,9 @@ def launch(context, tool_classes, system_design, **kwargs):
                 # python_code.render()
                 # playbook_code.render()
 
-        demo.launch(debug=True, **kwargs)
+    app = gr.mount_gradio_app(app, demo, path="/gradio", auth_dependency=get_user)
+
+    uvicorn.run(app, host="0.0.0.0", port=7860)
 
 
 @click.command()
