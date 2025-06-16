@@ -9,6 +9,7 @@ dependencies = [
     "textual",
     "rich",
     "itsdangerous",
+    "authlib",
 ]
 
 [tool.setuptools]
