@@ -93,7 +93,7 @@ def bot(context, prompt, messages, system_design, tools):
 
     # chat interface only needs the latest messages yielded
     messages = []
-    messages.append(gr.ChatMessage(role="user", content=full_prompt))
+    #messages.append(gr.ChatMessage(role="user", content=full_prompt))
     yield messages, python_output, playbook_output
     for msg in stream_to_gradio(
         agent, context, task=full_prompt, reset_agent_memory=False
@@ -189,9 +189,13 @@ def launch(context, tool_classes, system_design, **kwargs):
 
     with gr.Blocks(fill_height=True) as demo:
 
-        m = gr.Markdown("Welcome to Gradio!")
-        gr.Button("Logout", link="/logout")
-        demo.load(greet, None, m)
+        with gr.Row():
+            with gr.Column(scale=8):
+                pass
+            with gr.Column(scale=1):
+                m = gr.Markdown("Welcome to Gradio!")
+                gr.Button("Logout", link="/logout")
+                demo.load(greet, None, m)
 
         python_code = gr.Code(render=False, label="FTL Automation")
         playbook_code = gr.Code(render=False, label="Ansible playbook")
@@ -277,7 +281,7 @@ def launch(context, tool_classes, system_design, **kwargs):
                 gr.Timer(1).tick(fn=update_questions, outputs=current_question_input)
 
                 # python_code.render()
-                # playbook_code.render()
+                playbook_code.render()
 
     app = gr.mount_gradio_app(app, demo, path="/gradio", auth_dependency=get_user)
 

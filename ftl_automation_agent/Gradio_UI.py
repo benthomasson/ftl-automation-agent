@@ -39,11 +39,27 @@ from smolagents.memory import MemoryStep
 from ftl_automation_agent.memory import ActionStep
 
 
+def display_results(output):
+    print(f'display_results {output}')
+    if not isinstance(output, dict):
+        return
+    for name, results in output.items():
+        if results.get("failed"):
+            yield gr.ChatMessage(role="assistant", content=f"<span style=\"color:red\"> error: [{name}] </span>")
+            yield gr.ChatMessage(role="assistant", content=results.get("msg"))
+        if results.get("changed"):
+            yield gr.ChatMessage(role="assistant", content=f"<span style=\"color:yellow\"> changed: [{name}] </span>")
+        else:
+            yield gr.ChatMessage(role="assistant", content=f"<span style=\"color:green\"> ok: [{name}] </span>")
+
+
 def pull_messages_from_step(
     step_log: MemoryStep,
+    tools,
 ):
     """Extract ChatMessage objects from agent steps with proper nesting"""
 
+    print(tools)
     print(f"1. {type(step_log)=}")
     if isinstance(step_log, ActionStep):
         # Output the step number
@@ -52,14 +68,35 @@ def pull_messages_from_step(
         )
         yield gr.ChatMessage(role="assistant", content=f"**{step_number}**")
 
+        if hasattr(step_log, "trace") and step_log.trace is not None:
+            for fn in step_log.trace:
+                name = fn["func_name"]
+                if name not in tools:
+                    continue
+                if name.endswith("_tool"):
+                    name = name[: -len("_tool")]
+                if name in ["complete", "input", "user_input", "gradio_input"]:
+                    continue
+                args = fn["args"]
+                kwargs = " ".join([f"{k}={repr(v)}" for k,v in fn["kwargs"].items()])
+                result = fn["result"]
+                yield gr.ChatMessage(role="assistant", content=f'**TOOL [{name}]** {kwargs}')
+                yield gr.ChatMessage(role="assistant", content='---')
+                # yield gr.ChatMessage(role="assistant", content=f'args {args}')
+                # yield gr.ChatMessage(role="assistant", content=f'kwargs {kwargs}')
+
+                # yield gr.ChatMessage(role="assistant", content=f'result {result}')
+                for msg in display_results(result):
+                    yield msg
+
         # First yield the thought/reasoning from the LLM
         if hasattr(step_log, "model_output") and step_log.model_output is not None:
             print("model_output")
             # Clean up the LLM output
             model_output = step_log.model_output.strip()
-            # Remove think tokens
-            model_output = re.sub(r"<think>", "", model_output)  # handles <think>
-            model_output = re.sub(r"</think>", "", model_output)  # handles </think>
+            # Remove think blocks
+            model_output = re.sub(r"<think>.*</think>", "", model_output)  # handles <think>.*</think>
+            # model_output = re.sub(r"</think>", "", model_output)  # handles </think>
             # Remove any trailing <end_code> and extra backticks, handling multiple possible formats
             model_output = re.sub(
                 r"```\s*<end_code>", "```", model_output
@@ -75,7 +112,7 @@ def pull_messages_from_step(
             yield gr.ChatMessage(role="assistant", content=model_output)
 
         # For tool calls, create a parent message
-        if hasattr(step_log, "tool_calls") and step_log.tool_calls is not None:
+        if False and hasattr(step_log, "tool_calls") and step_log.tool_calls is not None:
             print("tool_calls")
             first_tool_call = step_log.tool_calls[0]
             used_code = first_tool_call.name == "python_interpreter"
@@ -206,33 +243,17 @@ def stream_to_gradio(
                 step_log.output_token_count = agent.model.last_output_token_count
 
         for message in pull_messages_from_step(
-            step_log,
+            step_log, context.tool_classes
         ):
             yield message
 
-    final_answer = step_log  # Last log is the run's final_answer
-    final_answer = handle_agent_output_types(final_answer)
+    #final_answer = step_log  # Last log is the run's final_answer
+    #final_answer = handle_agent_output_types(final_answer)
 
-    print(f"4. {type(final_answer)=}")
-    if isinstance(final_answer, AgentText):
-        yield gr.ChatMessage(
-            role="assistant",
-            content=f"**Final answer:**\n{final_answer.to_string()}\n",
-        )
-    elif isinstance(final_answer, AgentImage):
-        yield gr.ChatMessage(
-            role="assistant",
-            content={"path": final_answer.to_string(), "mime_type": "image/png"},
-        )
-    elif isinstance(final_answer, AgentAudio):
-        yield gr.ChatMessage(
-            role="assistant",
-            content={"path": final_answer.to_string(), "mime_type": "audio/wav"},
-        )
-    else:
-        yield gr.ChatMessage(
-            role="assistant", content=f"**Final answer:** {str(final_answer)}"
-        )
+    yield gr.ChatMessage(
+        role="assistant",
+        content=f"**Completed**"
+    )
 
 
 __all__ = ["stream_to_gradio"]

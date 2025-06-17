@@ -89,7 +89,7 @@ class InputTool(Tool):
 
 
 class GradioUserInputTool(Tool):
-    name = "user_input_tool"
+    name = "gradio_input_tool"
     description = "Asks for user's input on a specific question"
     inputs = {
         "question": {"type": "string", "description": "The question to ask the user"}

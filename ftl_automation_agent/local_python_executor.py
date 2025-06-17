@@ -648,8 +648,9 @@ def evaluate_call(
                 raise InterpreterError(
                     f"Invoking a builtin function that has not been explicitly added as a tool is not allowed ({func_name})."
                 )
-            state['_trace'].append({'func_name': func_name, 'args': args, 'kwargs': kwargs})
-            return func(*args, **kwargs)
+            result = func(*args, **kwargs)
+            state['_trace'].append({'func_name': func_name, 'args': args, 'kwargs': kwargs, 'result': result})
+            return result
 
 
 def evaluate_subscript(
