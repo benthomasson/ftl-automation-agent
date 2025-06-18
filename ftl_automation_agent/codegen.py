@@ -101,16 +101,18 @@ def generate_playbook_header(playbook, system_design, problem):
         f.write(yaml.dump([header]))
 
 
-def generate_playbook_task(playbook, o):
+def generate_playbook_task(playbook, o, tools):
     if not o.trace:
         return
     with open(playbook, "r") as f:
         data = yaml.safe_load(f.read())
     for fn in o.trace:
         name = fn["func_name"]
+        if name not in tools:
+            continue
         if name.endswith("_tool"):
             name = name[: -len("_tool")]
-        if name in ["complete", "input", "user_input"]:
+        if name in ["complete", "input", "user_input", "gradio_input"]:
             continue
         kwargs = fn["kwargs"]
         data[0]["tasks"].append({name: kwargs})

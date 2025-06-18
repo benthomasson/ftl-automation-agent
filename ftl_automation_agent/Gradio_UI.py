@@ -255,7 +255,7 @@ def stream_to_gradio(
             if step_log.tool_calls:
                 for call in step_log.tool_calls:
                     generate_python_tool_call(step_log, context.output, call)
-            generate_playbook_task(context.playbook, step_log)
+            generate_playbook_task(context.playbook, step_log, context.tool_classes)
         # Track tokens if model provides them
         if hasattr(agent.model, "last_input_token_count"):
             total_input_tokens += agent.model.last_input_token_count

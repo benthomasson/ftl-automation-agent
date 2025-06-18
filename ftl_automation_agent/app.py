@@ -32,6 +32,8 @@ from starlette.responses import RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
 import uvicorn
 
+from pprint import pprint
+
 
 console = Console()
 
@@ -80,27 +82,36 @@ def bot(context, prompt, messages, system_design, tools):
     generate_playbook_header(context.playbook, system_design, prompt)
 
     def update_code():
-        nonlocal python_output, playbook_output
+        nonlocal python_output, playbook_output, inventory_text
         with open(context.output) as f:
             python_output = f.read()
         with open(context.playbook) as f:
             playbook_output = f.read()
+        print(context.inventory)
+        if os.path.exists(context.inventory):
+            with open(context.inventory) as f:
+                inventory_text = f.read()
 
     python_output = ""
     playbook_output = ""
+    inventory_text = ""
+    print(f"{context.inventory=}")
+    if os.path.exists(context.inventory):
+        with open(context.inventory) as f:
+            inventory_text = f.read()
 
     update_code()
 
     # chat interface only needs the latest messages yielded
     messages = []
-    #messages.append(gr.ChatMessage(role="user", content=full_prompt))
-    yield messages, python_output, playbook_output
+    # messages.append(gr.ChatMessage(role="user", content=full_prompt))
+    yield messages, python_output, playbook_output, inventory_text
     for msg in stream_to_gradio(
         agent, context, task=full_prompt, reset_agent_memory=False
     ):
         update_code()
         messages.append(msg)
-        yield messages, python_output, playbook_output
+        yield messages, python_output, playbook_output, inventory_text
 
     if context.state["user_input"]:
         with open(context.user_input, "w") as f:
@@ -114,7 +125,7 @@ def bot(context, prompt, messages, system_design, tools):
     add_lookup_plugins(context.playbook)
     update_code()
 
-    yield messages, python_output, playbook_output
+    yield messages, python_output, playbook_output, inventory_text
 
 
 def launch(context, tool_classes, system_design, **kwargs):
@@ -124,6 +135,7 @@ def launch(context, tool_classes, system_design, **kwargs):
     # Replace these with your own OAuth settings
     GOOGLE_CLIENT_ID = os.environ["GOOGLE_CLIENT_ID"]
     GOOGLE_CLIENT_SECRET = os.environ["GOOGLE_CLIENT_SECRET"]
+    ALLOWED_USERS = os.environ["ALLOWED_USERS"].split(",")
 
     config_data = {
         "GOOGLE_CLIENT_ID": GOOGLE_CLIENT_ID,
@@ -176,6 +188,9 @@ def launch(context, tool_classes, system_design, **kwargs):
             access_token = await oauth.google.authorize_access_token(request)
         except OAuthError:
             return RedirectResponse(url="/")
+        pprint(dict(access_token)["userinfo"])
+        if access_token["userinfo"]["email"] not in ALLOWED_USERS:
+            return RedirectResponse(url="/")
         request.session["user"] = dict(access_token)["userinfo"]
         return RedirectResponse(url="/")
 
@@ -185,7 +200,7 @@ def launch(context, tool_classes, system_design, **kwargs):
     app = gr.mount_gradio_app(app, login_demo, path="/login-demo")
 
     def greet(request: gr.Request):
-        return f"Welcome to Gradio, {request.username}"
+        return f"Welcome, {request.username}!"
 
     with gr.Blocks(fill_height=True) as demo:
 
@@ -197,8 +212,9 @@ def launch(context, tool_classes, system_design, **kwargs):
                 gr.Button("Logout", link="/logout")
                 demo.load(greet, None, m)
 
-        python_code = gr.Code(render=False, label="FTL Automation")
-        playbook_code = gr.Code(render=False, label="Ansible playbook")
+        python_code = gr.Code(render=False, label="FTL Automation", language="python")
+        playbook_code = gr.Code(render=False, label="Ansible playbook", language="yaml")
+        inventory_text = gr.Code(render=False, label="Inventory", language="yaml")
         with gr.Row():
             with gr.Column():
                 system_design_field = gr.Textbox(
@@ -228,7 +244,7 @@ def launch(context, tool_classes, system_design, **kwargs):
                     additional_inputs_accordion=gr.Accordion(
                         label="Additional Inputs", open=False, render=False
                     ),
-                    additional_outputs=[python_code, playbook_code],
+                    additional_outputs=[python_code, playbook_code, inventory_text],
                     textbox=gr.MultimodalTextbox(
                         file_types=["text_encoded"], value=context.problem
                     ),
@@ -278,10 +294,19 @@ def launch(context, tool_classes, system_design, **kwargs):
                 def update_questions():
                     return context.state["questions"]
 
+                def update_inventory():
+                    inventory_text = ""
+                    if os.path.exists(context.inventory):
+                        with open(context.inventory) as f:
+                            inventory_text = f.read()
+                    return inventory_text
+
                 gr.Timer(1).tick(fn=update_questions, outputs=current_question_input)
+                gr.Timer(1).tick(fn=update_inventory, outputs=inventory_text)
 
                 # python_code.render()
                 playbook_code.render()
+                inventory_text.render()
 
     app = gr.mount_gradio_app(app, demo, path="/gradio", auth_dependency=get_user)
 
