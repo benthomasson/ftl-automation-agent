@@ -59,7 +59,7 @@ This is a real scenario.  Use the tools provided or ask for assistance.
 
 
 def load_session(sub):
-    session_file_name = f'sessions/{sub}/session.json'
+    session_file_name = f"sessions/{sub}/session.json"
     if os.path.exists(session_file_name):
         with open(session_file_name) as f:
             data = json.loads(f.read())
@@ -69,9 +69,9 @@ def load_session(sub):
 
 
 def save_session(sub, data):
-    session_file_name = f'sessions/{sub}/session.json'
+    session_file_name = f"sessions/{sub}/session.json"
     os.makedirs(os.path.dirname(session_file_name), exist_ok=True)
-    with open(session_file_name, 'w') as f:
+    with open(session_file_name, "w") as f:
         f.write(json.dumps(data))
 
 
@@ -222,41 +222,68 @@ def launch(context, tool_classes, system_design, **kwargs):
     def initialize(request: gr.Request):
         pprint(request.request.session["user"])
         data = load_session(request.request.session["user"]["sub"])
+        pprint(data)
         persistent_sessions[request.session_hash] = data
-        return f"Welcome, {request.username}!", data.get("title")
+        return (
+            f"Welcome, {request.username}!",
+            data.get("title"),
+            data.get("system_design"),
+            data.get("user_input"),
+        )
 
     def cleanup(request: gr.Request):
-        print('cleanup')
+        print("cleanup")
         if request.session_hash in persistent_sessions:
             pprint(persistent_sessions[request.session_hash])
-            save_session(request.request.session["user"]["sub"], persistent_sessions[request.session_hash])
+            save_session(
+                request.request.session["user"]["sub"],
+                persistent_sessions[request.session_hash],
+            )
             del persistent_sessions[request.session_hash]
 
-    def title_input(request: gr.Request, title):
-        persistent_sessions[request.session_hash]['title'] = title
-        print(title)
+    def persist_title_input(request: gr.Request, title):
+        persistent_sessions[request.session_hash]["title"] = title
+
+    def persist_system_design(request: gr.Request, system_design):
+        persistent_sessions[request.session_hash]["system_design"] = system_design
+
+    def clear_session(request: gr.Request):
+        print("clear_session")
+        data = {"title": "Session", "system_design": ""}
+        persistent_sessions[request.session_hash] = data
+        context.state['questions'] = []
+        context.state['user_input'] = {}
+        return data["title"], data["system_design"], None
 
     with gr.Blocks(fill_height=True) as demo:
 
         with gr.Sidebar(position="left", open=False):
             with gr.Column(scale=1):
-                title = gr.Textbox(show_label=False, value="New Session", interactive=True, submit_btn=False, scale=0)
-                title.input(title_input, inputs=[title])
-                gr.Button("Clear", scale=0)
+                title = gr.Textbox(
+                    show_label=False,
+                    value="New Session",
+                    interactive=True,
+                    submit_btn=False,
+                    scale=0,
+                )
+                title.input(persist_title_input, inputs=[title])
+                clear_session_btn = gr.Button("Clear", scale=0)
                 gr.Button("New", scale=0)
 
         with gr.Sidebar(position="right", open=False):
-                m = gr.Markdown("Welcome to Gradio!")
-                gr.Button("Logout", link="/logout", scale=0)
-        demo.load(initialize, None, [m, title])
+            m = gr.Markdown("Welcome to Gradio!")
+            gr.Button("Logout", link="/logout", scale=0)
 
-        python_code = gr.Code(render=False, label="FTL Automation", language="python")
-        playbook_code = gr.Code(render=False, label="Ansible playbook", language="yaml")
-        inventory_text = gr.Code(render=False, label="Inventory", language="yaml")
+        python_code = gr.Code(render=False, label="FTL Automation", language="python", visible=False)
+        playbook_code = gr.Code(render=False, label="Ansible playbook", language="yaml", visible=False)
+        inventory_text = gr.Code(render=False, label="Inventory", language="yaml", visible=False)
         with gr.Row():
             with gr.Column():
                 system_design_field = gr.Textbox(
                     system_design, label="System Design", render=False
+                )
+                system_design_field.input(
+                    persist_system_design, inputs=[system_design_field]
                 )
                 tool_check_boxes = gr.CheckboxGroup(
                     choices=sorted(tool_classes),
@@ -294,10 +321,15 @@ def launch(context, tool_classes, system_design, **kwargs):
                 current_question_input = gr.Textbox(visible=False)
 
                 @gr.render(inputs=current_question_input)
-                def render_form(*args, **kwargs):
+                def render_form(request: gr.Request, *args, **kwargs):
                     print("render_form")
                     print(args)
                     print(kwargs)
+                    if persistent_sessions[request.session_hash].get('user_input'):
+                        context.state["questions"] = []
+                        for question, answer in persistent_sessions[request.session_hash]['user_input'].items():
+                            context.state["questions"].append(question)
+                            context.state["user_input"][question] = answer
                     print(context.state["questions"])
                     print(context.state["user_input"])
                     if context.state["questions"]:
@@ -320,13 +352,17 @@ def launch(context, tool_classes, system_design, **kwargs):
                                 )
                         answer_button = gr.Button("Submit")
 
-                        def answer_questions(*args, **kwargs):
+                        def answer_questions(request: gr.Request, *args, **kwargs):
                             print(args)
                             print(kwargs)
+                            persistent_sessions[request.session_hash]["user_input"] = {}
                             for question, answer in zip(
                                 context.state["questions"], args
                             ):
                                 context.state["user_input"][question] = answer
+                                persistent_sessions[request.session_hash]["user_input"][
+                                    question
+                                ] = answer
 
                         answer_button.click(answer_questions, inputs=inputs)
 
@@ -343,10 +379,14 @@ def launch(context, tool_classes, system_design, **kwargs):
                 gr.Timer(1).tick(fn=update_questions, outputs=current_question_input)
                 gr.Timer(1).tick(fn=update_inventory, outputs=inventory_text)
 
-                # python_code.render()
+                python_code.render()
                 playbook_code.render()
                 inventory_text.render()
 
+        clear_session_btn.click(
+            clear_session, inputs=None, outputs=[title, system_design_field, current_question_input]
+        )
+        demo.load(initialize, inputs=None, outputs=[m, title, system_design_field, current_question_input])
         demo.unload(cleanup)
 
     app = gr.mount_gradio_app(app, demo, path="/ftl", auth_dependency=get_user)
