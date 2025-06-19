@@ -2,6 +2,7 @@ import os
 import time
 
 import click
+import json
 
 from .core import create_model, make_agent
 from .default_tools import TOOLS
@@ -55,6 +56,23 @@ Do not assume input values to the tools.  Ask the user.
 This is a real scenario.  Use the tools provided or ask for assistance.
 
 """
+
+
+def load_session(sub):
+    session_file_name = f'sessions/{sub}/session.json'
+    if os.path.exists(session_file_name):
+        with open(session_file_name) as f:
+            data = json.loads(f.read())
+        return data
+    else:
+        return {}
+
+
+def save_session(sub, data):
+    session_file_name = f'sessions/{sub}/session.json'
+    os.makedirs(os.path.dirname(session_file_name), exist_ok=True)
+    with open(session_file_name, 'w') as f:
+        f.write(json.dumps(data))
 
 
 def bot(context, prompt, messages, system_design, tools):
@@ -162,9 +180,9 @@ def launch(context, tool_classes, system_design, **kwargs):
     @app.get("/")
     def public(user: dict = Depends(get_user)):
         if user:
-            return RedirectResponse(url="/gradio")
+            return RedirectResponse(url="/ftl")
         else:
-            return RedirectResponse(url="/login-demo")
+            return RedirectResponse(url="/login-ftl")
 
     @app.route("/logout")
     async def logout(request: Request):
@@ -197,20 +215,40 @@ def launch(context, tool_classes, system_design, **kwargs):
     with gr.Blocks() as login_demo:
         gr.Button("Login", link="/login")
 
-    app = gr.mount_gradio_app(app, login_demo, path="/login-demo")
+    app = gr.mount_gradio_app(app, login_demo, path="/login-ftl")
 
-    def greet(request: gr.Request):
-        return f"Welcome, {request.username}!"
+    persistent_sessions = {}
+
+    def initialize(request: gr.Request):
+        pprint(request.request.session["user"])
+        data = load_session(request.request.session["user"]["sub"])
+        persistent_sessions[request.session_hash] = data
+        return f"Welcome, {request.username}!", data.get("title")
+
+    def cleanup(request: gr.Request):
+        print('cleanup')
+        if request.session_hash in persistent_sessions:
+            pprint(persistent_sessions[request.session_hash])
+            save_session(request.request.session["user"]["sub"], persistent_sessions[request.session_hash])
+            del persistent_sessions[request.session_hash]
+
+    def title_input(request: gr.Request, title):
+        persistent_sessions[request.session_hash]['title'] = title
+        print(title)
 
     with gr.Blocks(fill_height=True) as demo:
 
         with gr.Row():
+            with gr.Column(scale=1):
+                title = gr.Textbox(show_label=False, value="New Session", interactive=True, submit_btn=False)
+                title.input(title_input, inputs=[title])
             with gr.Column(scale=8):
                 pass
             with gr.Column(scale=1):
                 m = gr.Markdown("Welcome to Gradio!")
                 gr.Button("Logout", link="/logout")
-                demo.load(greet, None, m)
+
+        demo.load(initialize, None, [m, title])
 
         python_code = gr.Code(render=False, label="FTL Automation", language="python")
         playbook_code = gr.Code(render=False, label="Ansible playbook", language="yaml")
@@ -237,6 +275,7 @@ def launch(context, tool_classes, system_design, **kwargs):
                     fn=partial(bot, context),
                     type="messages",
                     chatbot=chatbot,
+                    stop_btn=True,
                     additional_inputs=[
                         system_design_field,
                         tool_check_boxes,
@@ -308,7 +347,9 @@ def launch(context, tool_classes, system_design, **kwargs):
                 playbook_code.render()
                 inventory_text.render()
 
-    app = gr.mount_gradio_app(app, demo, path="/gradio", auth_dependency=get_user)
+        demo.unload(cleanup)
+
+    app = gr.mount_gradio_app(app, demo, path="/ftl", auth_dependency=get_user)
 
     uvicorn.run(app, host="0.0.0.0", port=7860)
 
