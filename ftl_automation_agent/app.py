@@ -238,16 +238,16 @@ def launch(context, tool_classes, system_design, **kwargs):
 
     with gr.Blocks(fill_height=True) as demo:
 
-        with gr.Row():
+        with gr.Sidebar(position="left", open=False):
             with gr.Column(scale=1):
-                title = gr.Textbox(show_label=False, value="New Session", interactive=True, submit_btn=False)
+                title = gr.Textbox(show_label=False, value="New Session", interactive=True, submit_btn=False, scale=0)
                 title.input(title_input, inputs=[title])
-            with gr.Column(scale=8):
-                pass
-            with gr.Column(scale=1):
-                m = gr.Markdown("Welcome to Gradio!")
-                gr.Button("Logout", link="/logout")
+                gr.Button("Clear", scale=0)
+                gr.Button("New", scale=0)
 
+        with gr.Sidebar(position="right", open=False):
+                m = gr.Markdown("Welcome to Gradio!")
+                gr.Button("Logout", link="/logout", scale=0)
         demo.load(initialize, None, [m, title])
 
         python_code = gr.Code(render=False, label="FTL Automation", language="python")
