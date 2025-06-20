@@ -229,6 +229,10 @@ def launch(context, tool_classes, system_design, **kwargs):
             data.get("title"),
             data.get("system_design"),
             data.get("user_input"),
+            data.get("chat"),
+            data.get("python_code"),
+            data.get("playbook_code"),
+            data.get("inventory_text"),
         )
 
     def cleanup(request: gr.Request):
@@ -247,13 +251,28 @@ def launch(context, tool_classes, system_design, **kwargs):
     def persist_system_design(request: gr.Request, system_design):
         persistent_sessions[request.session_hash]["system_design"] = system_design
 
+    def persist_tool_check_boxes(request: gr.Request, tool_check_boxes):
+        persistent_sessions[request.session_hash]["tool_check_boxes"] = tool_check_boxes
+
+    def persist_chat(request: gr.Request, chat):
+        persistent_sessions[request.session_hash]["chat"] = chat
+
+    def persist_python_code(request: gr.Request, python_code):
+        persistent_sessions[request.session_hash]["python_code"] = python_code
+
+    def persist_playbook_code(request: gr.Request, playbook_code):
+        persistent_sessions[request.session_hash]["playbook_code"] = playbook_code
+
+    def persist_inventory_text(request: gr.Request, inventory_text):
+        persistent_sessions[request.session_hash]["inventory_text"] = inventory_text
+
     def clear_session(request: gr.Request):
         print("clear_session")
         data = {"title": "Session", "system_design": ""}
         persistent_sessions[request.session_hash] = data
-        context.state['questions'] = []
-        context.state['user_input'] = {}
-        return data["title"], data["system_design"], None
+        context.state["questions"] = []
+        context.state["user_input"] = {}
+        return data["title"], data["system_design"], None, None, None, None, None
 
     with gr.Blocks(fill_height=True) as demo:
 
@@ -266,23 +285,38 @@ def launch(context, tool_classes, system_design, **kwargs):
                     submit_btn=False,
                     scale=0,
                 )
-                title.input(persist_title_input, inputs=[title])
+                title.change(persist_title_input, inputs=[title])
                 clear_session_btn = gr.Button("Clear", scale=0)
-                gr.Button("New", scale=0)
+                gr.Button(
+                    "New",
+                    scale=0,
+                    variant="primary",
+                    icon=gr.utils.get_icon_path("plus.svg"),
+                    visible=False,
+                )
 
         with gr.Sidebar(position="right", open=False):
             m = gr.Markdown("Welcome to Gradio!")
             gr.Button("Logout", link="/logout", scale=0)
 
-        python_code = gr.Code(render=False, label="FTL Automation", language="python", visible=False)
-        playbook_code = gr.Code(render=False, label="Ansible playbook", language="yaml", visible=False)
-        inventory_text = gr.Code(render=False, label="Inventory", language="yaml", visible=False)
+        python_code = gr.Code(
+            render=False, label="FTL Automation", language="python", visible=True
+        )
+        python_code.change(persist_python_code, inputs=[python_code])
+        playbook_code = gr.Code(
+            render=False, label="Ansible playbook", language="yaml", visible=True
+        )
+        playbook_code.change(persist_playbook_code, inputs=[playbook_code])
+        inventory_text = gr.Code(
+            render=False, label="Inventory", language="yaml", visible=True
+        )
+        inventory_text.change(persist_inventory_text, inputs=[inventory_text])
         with gr.Row():
             with gr.Column():
                 system_design_field = gr.Textbox(
                     system_design, label="System Design", render=False
                 )
-                system_design_field.input(
+                system_design_field.change(
                     persist_system_design, inputs=[system_design_field]
                 )
                 tool_check_boxes = gr.CheckboxGroup(
@@ -292,17 +326,21 @@ def launch(context, tool_classes, system_design, **kwargs):
                     render=False,
                 )
 
+                tool_check_boxes.change(
+                    persist_tool_check_boxes, inputs=[tool_check_boxes]
+                )
+
                 chatbot = gr.Chatbot(
                     label="FTL Agent",
                     type="messages",
                     resizeable=True,
                     scale=1,
                 )
+                chatbot.change(persist_chat, inputs=[chatbot])
                 gr.ChatInterface(
                     fn=partial(bot, context),
                     type="messages",
                     chatbot=chatbot,
-                    stop_btn=True,
                     additional_inputs=[
                         system_design_field,
                         tool_check_boxes,
@@ -312,8 +350,11 @@ def launch(context, tool_classes, system_design, **kwargs):
                     ),
                     additional_outputs=[python_code, playbook_code, inventory_text],
                     textbox=gr.MultimodalTextbox(
-                        file_types=["text_encoded"], value=context.problem
+                        file_types=["text_encoded"],
+                        value=context.problem,
+                        stop_btn=True,
                     ),
+                    save_history=False,
                 )
 
             with gr.Column():
@@ -325,10 +366,14 @@ def launch(context, tool_classes, system_design, **kwargs):
                     print("render_form")
                     print(args)
                     print(kwargs)
-                    if persistent_sessions[request.session_hash].get('user_input'):
-                        context.state["questions"] = []
-                        for question, answer in persistent_sessions[request.session_hash]['user_input'].items():
-                            context.state["questions"].append(question)
+                    if persistent_sessions[request.session_hash].get("user_input"):
+                        if "questions" not in context.state:
+                            context.state["questions"] = []
+                        for question, answer in persistent_sessions[
+                            request.session_hash
+                        ]["user_input"].items():
+                            if question not in context.state["questions"]:
+                                context.state["questions"].append(question)
                             context.state["user_input"][question] = answer
                     print(context.state["questions"])
                     print(context.state["user_input"])
@@ -350,7 +395,8 @@ def launch(context, tool_classes, system_design, **kwargs):
                                         label=q,
                                     )
                                 )
-                        answer_button = gr.Button("Submit")
+                        answer_button = gr.Button("Submit", scale=0)
+                        clear_button = gr.Button("Clear", scale=0)
 
                         def answer_questions(request: gr.Request, *args, **kwargs):
                             print(args)
@@ -364,7 +410,13 @@ def launch(context, tool_classes, system_design, **kwargs):
                                     question
                                 ] = answer
 
+                        def clear_questions(request: gr.Request, *args, **kwargs):
+                            persistent_sessions[request.session_hash]["user_input"] = {}
+                            context.state["questions"] = []
+
                         answer_button.click(answer_questions, inputs=inputs)
+
+                        clear_button.click(clear_questions, inputs=inputs)
 
                 def update_questions():
                     return context.state["questions"]
@@ -384,9 +436,32 @@ def launch(context, tool_classes, system_design, **kwargs):
                 inventory_text.render()
 
         clear_session_btn.click(
-            clear_session, inputs=None, outputs=[title, system_design_field, current_question_input]
+            clear_session,
+            inputs=None,
+            outputs=[
+                title,
+                system_design_field,
+                current_question_input,
+                chatbot,
+                python_code,
+                playbook_code,
+                inventory_text,
+            ],
         )
-        demo.load(initialize, inputs=None, outputs=[m, title, system_design_field, current_question_input])
+        demo.load(
+            initialize,
+            inputs=None,
+            outputs=[
+                m,
+                title,
+                system_design_field,
+                current_question_input,
+                chatbot,
+                python_code,
+                playbook_code,
+                inventory_text,
+            ],
+        )
         demo.unload(cleanup)
 
     app = gr.mount_gradio_app(app, demo, path="/ftl", auth_dependency=get_user)
