@@ -97,6 +97,7 @@ def automation(tools_files, tools, inventory, modules, user_input=None, log=None
         "user_input": user_input,
         "log": log,
         "console": console,
+        "questions": [],
     }
     state.update(kwargs)
 
