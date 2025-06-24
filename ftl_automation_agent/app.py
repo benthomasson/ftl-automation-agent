@@ -124,10 +124,7 @@ def bot(context, prompt, messages, system_design, tools):
 
     update_code()
 
-    # chat interface only needs the latest messages yielded
     messages = []
-    # messages.append(gr.ChatMessage(role="user", content=full_prompt))
-    yield messages, python_output, playbook_output, inventory_text
     for msg in stream_to_gradio(
         agent, context, task=full_prompt, reset_agent_memory=False
     ):
