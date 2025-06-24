@@ -4,6 +4,7 @@ import time
 import click
 import json
 import shutil
+import glob
 
 
 from collections import defaultdict
@@ -318,7 +319,7 @@ def launch(context, tool_classes, system_design, **kwargs):
     def render_workspace():
 
         with gr.Tab("Workspace"):
-            workspace_files = gr.Files()
+            workspace_files = gr.Files(glob.glob(os.path.join(context.workspace, '*')))
             workspace_files.upload(upload_file, inputs=[workspace_files])
 
 
