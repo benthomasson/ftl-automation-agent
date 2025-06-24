@@ -3,7 +3,10 @@ import time
 
 import click
 import json
+import shutil
 
+
+from collections import defaultdict
 from .core import create_model, make_agent
 from .default_tools import TOOLS
 from .tools import get_tool, load_tools
@@ -80,7 +83,7 @@ def bot(context, prompt, messages, system_design, tools):
     if isinstance(prompt, dict):
         prompt = prompt["text"]
 
-    full_prompt = TASK_PROMPT + prompt
+    full_prompt = TASK_PROMPT + prompt + "\nThen call complete() when done."
     agent = make_agent(
         tools=[get_tool(context.tool_classes, t, context.state) for t in tools],
         model=context.model,
@@ -217,7 +220,7 @@ def launch(context, tool_classes, system_design, **kwargs):
 
     app = gr.mount_gradio_app(app, login_demo, path="/login-ftl")
 
-    persistent_sessions = {}
+    persistent_sessions = defaultdict(dict)
 
     def initialize(request: gr.Request):
         pprint(request.request.session["user"])
@@ -274,7 +277,7 @@ def launch(context, tool_classes, system_design, **kwargs):
         context.state["user_input"] = {}
         return data["title"], data["system_design"], None, None, None, None, None
 
-    with gr.Blocks(fill_height=True) as demo:
+    def render_left_bar():
 
         with gr.Sidebar(position="left", open=False):
             with gr.Column(scale=1):
@@ -295,145 +298,175 @@ def launch(context, tool_classes, system_design, **kwargs):
                     visible=False,
                 )
 
+        return title, clear_session_btn
+
+    def render_right_bar():
+
         with gr.Sidebar(position="right", open=False):
-            m = gr.Markdown("Welcome to Gradio!")
+            welcome = gr.Markdown("Welcome to Gradio!")
             gr.Button("Logout", link="/logout", scale=0)
 
-        python_code = gr.Code(
-            render=False, label="FTL Automation", language="python", visible=True
-        )
-        python_code.change(persist_python_code, inputs=[python_code])
-        playbook_code = gr.Code(
-            render=False, label="Ansible playbook", language="yaml", visible=True
-        )
-        playbook_code.change(persist_playbook_code, inputs=[playbook_code])
-        inventory_text = gr.Code(
-            render=False, label="Inventory", language="yaml", visible=True
-        )
-        inventory_text.change(persist_inventory_text, inputs=[inventory_text])
-        with gr.Row():
-            with gr.Column():
-                system_design_field = gr.Textbox(
-                    system_design, label="System Design", render=False
-                )
-                system_design_field.change(
-                    persist_system_design, inputs=[system_design_field]
-                )
-                tool_check_boxes = gr.CheckboxGroup(
-                    choices=sorted(tool_classes),
-                    value=sorted(context.tools),
-                    label="Tools",
-                    render=False,
-                )
+        return welcome
 
-                tool_check_boxes.change(
-                    persist_tool_check_boxes, inputs=[tool_check_boxes]
-                )
 
-                chatbot = gr.Chatbot(
-                    label="FTL Agent",
-                    type="messages",
-                    resizeable=True,
-                    scale=1,
-                )
-                chatbot.change(persist_chat, inputs=[chatbot])
-                gr.ChatInterface(
-                    fn=partial(bot, context),
-                    type="messages",
-                    chatbot=chatbot,
-                    additional_inputs=[
-                        system_design_field,
-                        tool_check_boxes,
-                    ],
-                    additional_inputs_accordion=gr.Accordion(
-                        label="Additional Inputs", open=False, render=False
-                    ),
-                    additional_outputs=[python_code, playbook_code, inventory_text],
-                    textbox=gr.MultimodalTextbox(
-                        file_types=["text_encoded"],
-                        value=context.problem,
-                        stop_btn=True,
-                    ),
-                    save_history=False,
-                )
+    def upload_file(files):
+        for file_name in files:
+            print(file_name)
+            shutil.copy(file_name, context.workspace)
 
-            with gr.Column():
 
-                current_question_input = gr.Textbox(visible=False)
+    def render_workspace():
 
-                @gr.render(inputs=current_question_input)
-                def render_form(request: gr.Request, *args, **kwargs):
-                    print("render_form")
-                    print(args)
-                    print(kwargs)
-                    if persistent_sessions[request.session_hash].get("user_input"):
-                        if "questions" not in context.state:
-                            context.state["questions"] = []
-                        for question, answer in persistent_sessions[
-                            request.session_hash
-                        ]["user_input"].items():
-                            if question not in context.state["questions"]:
-                                context.state["questions"].append(question)
-                            context.state["user_input"][question] = answer
-                    print(context.state["questions"])
-                    print(context.state["user_input"])
-                    if context.state["questions"]:
-                        gr.Markdown("### Please answer the following questions:")
-                        inputs = []
-                        for q in context.state["questions"]:
-                            if q in context.state["user_input"]:
-                                inputs.append(
-                                    gr.Textbox(
-                                        label=q,
-                                        value=context.state["user_input"][q],
-                                        interactive=False,
-                                    )
-                                )
-                            else:
-                                inputs.append(
-                                    gr.Textbox(
-                                        label=q,
-                                    )
-                                )
-                        answer_button = gr.Button("Submit", scale=0)
-                        clear_button = gr.Button("Clear", scale=0)
+        with gr.Tab("Workspace"):
+            workspace_files = gr.Files()
+            workspace_files.upload(upload_file, inputs=[workspace_files])
 
-                        def answer_questions(request: gr.Request, *args, **kwargs):
-                            print(args)
-                            print(kwargs)
-                            persistent_sessions[request.session_hash]["user_input"] = {}
-                            for question, answer in zip(
-                                context.state["questions"], args
-                            ):
+
+
+    with gr.Blocks(fill_height=True) as demo:
+
+        title, clear_session_btn = render_left_bar()
+        welcome = render_right_bar()
+
+        with gr.Tab("Agent"):
+
+            python_code = gr.Code(
+                render=False, label="FTL Automation", language="python", visible=True
+            )
+            python_code.change(persist_python_code, inputs=[python_code])
+            playbook_code = gr.Code(
+                render=False, label="Ansible playbook", language="yaml", visible=True
+            )
+            playbook_code.change(persist_playbook_code, inputs=[playbook_code])
+            inventory_text = gr.Code(
+                render=False, label="Inventory", language="yaml", visible=True
+            )
+            inventory_text.change(persist_inventory_text, inputs=[inventory_text])
+            with gr.Row():
+                with gr.Column():
+                    system_design_field = gr.Textbox(
+                        system_design, label="System Design", render=False
+                    )
+                    system_design_field.change(
+                        persist_system_design, inputs=[system_design_field]
+                    )
+                    tool_check_boxes = gr.CheckboxGroup(
+                        choices=sorted(tool_classes),
+                        value=sorted(context.tools),
+                        label="Tools",
+                        render=False,
+                    )
+
+                    tool_check_boxes.change(
+                        persist_tool_check_boxes, inputs=[tool_check_boxes]
+                    )
+
+                    chatbot = gr.Chatbot(
+                        label="FTL Agent",
+                        type="messages",
+                        resizeable=True,
+                        scale=1,
+                    )
+                    chatbot.change(persist_chat, inputs=[chatbot])
+                    gr.ChatInterface(
+                        fn=partial(bot, context),
+                        type="messages",
+                        chatbot=chatbot,
+                        additional_inputs=[
+                            system_design_field,
+                            tool_check_boxes,
+                        ],
+                        additional_inputs_accordion=gr.Accordion(
+                            label="Additional Inputs", open=False, render=False
+                        ),
+                        additional_outputs=[python_code, playbook_code, inventory_text],
+                        textbox=gr.MultimodalTextbox(
+                            file_types=[".conf"],
+                            value=context.problem,
+                            stop_btn=True,
+                        ),
+                        save_history=False,
+                    )
+
+                with gr.Column():
+
+                    current_question_input = gr.Textbox(visible=False)
+
+                    @gr.render(inputs=current_question_input)
+                    def render_form(request: gr.Request, *args, **kwargs):
+                        print("render_form")
+                        print(args)
+                        print(kwargs)
+                        if persistent_sessions[request.session_hash].get("user_input"):
+                            if "questions" not in context.state:
+                                context.state["questions"] = []
+                            for question, answer in persistent_sessions[
+                                request.session_hash
+                            ]["user_input"].items():
+                                if question not in context.state["questions"]:
+                                    context.state["questions"].append(question)
                                 context.state["user_input"][question] = answer
-                                persistent_sessions[request.session_hash]["user_input"][
-                                    question
-                                ] = answer
+                        print(context.state["questions"])
+                        print(context.state["user_input"])
+                        if context.state["questions"]:
+                            gr.Markdown("### Please answer the following questions:")
+                            inputs = []
+                            for q in context.state["questions"]:
+                                if q in context.state["user_input"]:
+                                    inputs.append(
+                                        gr.Textbox(
+                                            label=q,
+                                            value=context.state["user_input"][q],
+                                            interactive=False,
+                                        )
+                                    )
+                                else:
+                                    inputs.append(
+                                        gr.Textbox(
+                                            label=q,
+                                        )
+                                    )
+                            answer_button = gr.Button("Submit", scale=0)
+                            clear_button = gr.Button("Clear", scale=0)
 
-                        def clear_questions(request: gr.Request, *args, **kwargs):
-                            persistent_sessions[request.session_hash]["user_input"] = {}
-                            context.state["questions"] = []
+                            def answer_questions(request: gr.Request, *args, **kwargs):
+                                print(args)
+                                print(kwargs)
+                                persistent_sessions[request.session_hash]["user_input"] = {}
+                                for question, answer in zip(
+                                    context.state["questions"], args
+                                ):
+                                    context.state["user_input"][question] = answer
+                                    persistent_sessions[request.session_hash]["user_input"][
+                                        question
+                                    ] = answer
 
-                        answer_button.click(answer_questions, inputs=inputs)
+                            def clear_questions(request: gr.Request, *args, **kwargs):
+                                persistent_sessions[request.session_hash]["user_input"] = {}
+                                context.state["questions"] = []
 
-                        clear_button.click(clear_questions, inputs=inputs)
+                            answer_button.click(answer_questions, inputs=inputs)
 
-                def update_questions():
-                    return context.state["questions"]
+                            clear_button.click(clear_questions, inputs=inputs)
 
-                def update_inventory():
-                    inventory_text = ""
-                    if os.path.exists(context.inventory):
-                        with open(context.inventory) as f:
-                            inventory_text = f.read()
-                    return inventory_text
+                    def update_questions():
+                        return context.state["questions"]
 
-                gr.Timer(1).tick(fn=update_questions, outputs=current_question_input)
-                gr.Timer(1).tick(fn=update_inventory, outputs=inventory_text)
+                    def update_inventory():
+                        inventory_text = ""
+                        if os.path.exists(context.inventory):
+                            with open(context.inventory) as f:
+                                inventory_text = f.read()
+                        return inventory_text
 
-                python_code.render()
-                playbook_code.render()
-                inventory_text.render()
+                    gr.Timer(1).tick(fn=update_questions, outputs=current_question_input)
+                    gr.Timer(1).tick(fn=update_inventory, outputs=inventory_text)
+
+                    # python_code.render()
+                    playbook_code.render()
+                    inventory_text.render()
+
+        render_workspace()
 
         clear_session_btn.click(
             clear_session,
@@ -452,7 +485,7 @@ def launch(context, tool_classes, system_design, **kwargs):
             initialize,
             inputs=None,
             outputs=[
-                m,
+                welcome,
                 title,
                 system_design_field,
                 current_question_input,
@@ -487,6 +520,7 @@ def launch(context, tool_classes, system_design, **kwargs):
 @click.option("--user-input", default="user_input-{time}.yml")
 @click.option("--server-name", default="127.0.0.1")
 @click.option("--llm-api-base", default=None)
+@click.option("--workspace", default="workspace")
 def main(
     tools,
     tools_files,
@@ -504,6 +538,7 @@ def main(
     user_input,
     server_name,
     llm_api_base,
+    workspace,
 ):
     """A agent that solves a problem given a system design and a set of tools"""
     start = time.time()
@@ -562,6 +597,10 @@ def main(
         explain=explain,
         playbook=playbook,
         user_input=user_input,
+        workspace=workspace,
     )
+
+    os.makedirs(workspace, exist_ok=True)
+    #os.chdir(workspace)
 
     launch(context, tool_classes, system_design, server_name=server_name)
