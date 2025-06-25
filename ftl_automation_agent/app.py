@@ -219,6 +219,7 @@ def launch(context, tool_classes, system_design, **kwargs):
     app = gr.mount_gradio_app(app, login_demo, path="/login-ftl")
 
     persistent_sessions = defaultdict(dict)
+    user_contexts = defaultdict(dict)
 
     def initialize(request: gr.Request):
         pprint(request.request.session["user"])
@@ -309,15 +310,36 @@ def launch(context, tool_classes, system_design, **kwargs):
 
     def upload_file(files):
         for file_name in files:
-            print(file_name)
+            print('upload', file_name)
             shutil.copy(file_name, context.workspace)
+
+    def delete_file(deleted_file: gr.DeletedFileData, *args, **kwargs):
+        print('delete', deleted_file, deleted_file.file.path)
+        print(args)
+        print(kwargs)
+        workspace_file_name = os.path.join(context.workspace, os.path.basename(deleted_file.file.path))
+        if os.path.exists(workspace_file_name):
+            os.unlink(workspace_file_name)
+
+    def clear_file(*args, **kwargs):
+        print('clear')
+        print(args)
+        print(kwargs)
+        shutil.rmtree(context.workspace)
+        os.makedirs(context.workspace, exist_ok=True)
+
+
 
 
     def render_workspace():
 
         with gr.Tab("Workspace"):
-            workspace_files = gr.Files(glob.glob(os.path.join(context.workspace, '*')))
+            workspace_files = gr.Files()
             workspace_files.upload(upload_file, inputs=[workspace_files])
+            workspace_files.delete(delete_file, inputs=[workspace_files])
+            workspace_files.clear(clear_file, inputs=[workspace_files])
+
+        return workspace_files
 
 
 
@@ -464,7 +486,7 @@ def launch(context, tool_classes, system_design, **kwargs):
                     playbook_code.render()
                     inventory_text.render()
 
-        render_workspace()
+        workspace_files = render_workspace()
 
         clear_session_btn.click(
             clear_session,
@@ -569,6 +591,7 @@ def main(
         "log": None,
         "console": console,
         "questions": [],
+        "workspace": workspace,
     }
     for extra_var in extra_vars:
         name, _, value = extra_var.partition("=")
