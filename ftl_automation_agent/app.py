@@ -13,7 +13,6 @@ from .default_tools import TOOLS
 from .tools import get_tool, load_tools
 import faster_than_light as ftl
 import gradio as gr
-from functools import partial
 import yaml
 from rich.console import Console
 
@@ -64,7 +63,7 @@ This is a real scenario.  Use the tools provided or ask for assistance.
 
 
 def load_session(sub):
-    session_file_name = f"sessions/{sub}/session.json"
+    session_file_name = f"/sessions/{sub}/session.json"
     if os.path.exists(session_file_name):
         with open(session_file_name) as f:
             data = json.loads(f.read())
@@ -74,13 +73,13 @@ def load_session(sub):
 
 
 def save_session(sub, data):
-    session_file_name = f"sessions/{sub}/session.json"
+    session_file_name = f"/sessions/{sub}/session.json"
     os.makedirs(os.path.dirname(session_file_name), exist_ok=True)
     with open(session_file_name, "w") as f:
         f.write(json.dumps(data))
 
 
-def launch(model, tool_classes, modules):
+def launch(model, tool_classes, tools_files, modules_resolved, modules):
 
     app = FastAPI()
 
@@ -107,7 +106,12 @@ def launch(model, tool_classes, modules):
     SECRET_KEY = os.environ["SECRET_KEY"]
     app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 
-    def bot(request, prompt, messages, system_design, tools):
+    def bot(prompt, messages, system_design, tools, request: gr.Request):
+        print(f"{prompt=}")
+        print(f"{messages=}")
+        print(f"{system_design=}")
+        print(f"{tools=}")
+        print(f"{request=}")
 
         context = user_contexts[request.session_hash]
 
@@ -119,15 +123,21 @@ def launch(model, tool_classes, modules):
             tools=[get_tool(tool_classes, t, context.state) for t in tools],
             model=model,
         )
+        context.output = os.path.join(context.outputs, f"output-{time.time}.py")
+        context.explain = os.path.join(context.outputs, f"output-{time.time}.txt")
+        context.playbook = os.path.join(context.outputs, f"output-{time.time}.yml")
+        context.user_input = os.path.join(
+            context.outputs, f"user_input-{time.time}.yml"
+        )
         generate_python_header(
             context.output,
             system_design,
             prompt,
-            context.tools_files,
+            tools_files,
             tools,
             context.inventory,
-            context.modules,
-            context.extra_vars,
+            modules,
+            {},  # context.extra_vars,
             context.user_input,
         )
         generate_explain_header(context.explain, system_design, full_prompt)
@@ -225,22 +235,35 @@ def launch(model, tool_classes, modules):
 
     def initialize(request: gr.Request):
         pprint(request.request.session["user"])
-        data = load_session(request.request.session["user"]["sub"])
+        sub = request.request.session["user"]["sub"]
+        data = load_session(sub)
         pprint(data)
         persistent_sessions[request.session_hash] = data
-        inventory = "/workspace/inventory.yml"
-        state = {"inventory": ftl.load_inventory(inventory),
-                 "localhost": ftl.localhost,
-                 "modules": modules,
-                 "user_input": {},
-                 "gate": None,
-                 "loop": None,
-                 "gate_cache": None,
-                 "log": None,
-                 "console": console,
-                 "questions": [],
-                }
-        user_contexts[request.session_hash] = Bunch(state=state, inventory=inventory)
+        workspace = os.path.join("/workspace", sub)
+        outputs = os.path.join("/outputs", sub)
+        os.makedirs(workspace, exist_ok=True)
+        os.makedirs(outputs, exist_ok=True)
+        inventory = os.path.join(workspace, "inventory.yml")
+        workspace_files = glob.glob(os.path.join(workspace, "*"))
+        state = {
+            "inventory": ftl.load_inventory(inventory),
+            "localhost": ftl.localhost,
+            "modules": modules_resolved,
+            "user_input": {},
+            "gate": None,
+            "loop": None,
+            "gate_cache": None,
+            "log": None,
+            "console": console,
+            "questions": [],
+            "workspace": workspace,
+        }
+        user_contexts[request.session_hash] = Bunch(
+            state=state,
+            inventory=inventory,
+            outputs=outputs,
+            tool_classes=tool_classes,
+        )
         return (
             f"Welcome, {request.username}!",
             data.get("title"),
@@ -251,6 +274,7 @@ def launch(model, tool_classes, modules):
             data.get("playbook_code"),
             data.get("inventory_text"),
             data.get("tool_check_boxes"),
+            workspace_files,
         )
 
     def cleanup(request: gr.Request):
@@ -437,42 +461,21 @@ def launch(model, tool_classes, modules):
                         print(args)
                         print(kwargs)
                         if persistent_sessions[request.session_hash].get("user_input"):
-                            if (
-                                "questions"
-                                not in context.state
-                            ):
-                                context.state[
-                                    "questions"
-                                ] = []
+                            if "questions" not in context.state:
+                                context.state["questions"] = []
                             for question, answer in persistent_sessions[
                                 request.session_hash
                             ]["user_input"].items():
-                                if (
-                                    question
-                                    not in context.state[
-                                        "questions"
-                                    ]
-                                ):
-                                    context.state[
-                                        "questions"
-                                    ].append(question)
-                                context.state["user_input"][
-                                    question
-                                ] = answer
+                                if question not in context.state["questions"]:
+                                    context.state["questions"].append(question)
+                                context.state["user_input"][question] = answer
                         print(context.state["questions"])
                         print(context.state["user_input"])
                         if context.state["questions"]:
                             gr.Markdown("### Please answer the following questions:")
                             inputs = []
-                            for q in context.state[
-                                "questions"
-                            ]:
-                                if (
-                                    q
-                                    in context.state[
-                                        "user_input"
-                                    ]
-                                ):
+                            for q in context.state["questions"]:
+                                if q in context.state["user_input"]:
                                     inputs.append(
                                         gr.Textbox(
                                             label=q,
@@ -496,9 +499,7 @@ def launch(model, tool_classes, modules):
                                     "user_input"
                                 ] = {}
                                 for question, answer in zip(
-                                    context.state[
-                                        "questions"
-                                    ],
+                                    context.state["questions"],
                                     args,
                                 ):
                                     user_contexts[request.session_hash].state[
@@ -571,6 +572,7 @@ def launch(model, tool_classes, modules):
                 playbook_code,
                 inventory_text,
                 tool_check_boxes,
+                workspace_files,
             ],
         )
         demo.unload(cleanup)
@@ -603,4 +605,4 @@ def main(
         modules_path = resolve_modules_path_or_package(modules_path_or_package)
         modules_resolved.append(modules_path)
 
-    launch(model, tool_classes, modules)
+    launch(model, tool_classes, tools_files, modules_resolved, modules)
