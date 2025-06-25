@@ -54,6 +54,7 @@ Do not import the `os` package.
 Do not import the `socket` package.
 Do not use the open function.
 Only use the tools provided.
+Use local paths for all source paths for files. They are relative to the local workspace.
 Do not assume input values to the tools.  Ask the user.
 
 
