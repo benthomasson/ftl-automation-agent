@@ -85,7 +85,7 @@ def launch(model, tool_classes, modules):
     app = FastAPI()
 
     persistent_sessions = defaultdict(dict)
-    user_contexts = defaultdict(dict)
+    user_contexts = dict()
 
     # Replace these with your own OAuth settings
     GOOGLE_CLIENT_ID = os.environ["GOOGLE_CLIENT_ID"]
@@ -228,7 +228,19 @@ def launch(model, tool_classes, modules):
         data = load_session(request.request.session["user"]["sub"])
         pprint(data)
         persistent_sessions[request.session_hash] = data
-        user_contexts[request.session_hash] = Bunch()
+        inventory = "/workspace/inventory.yml"
+        state = {"inventory": ftl.load_inventory(inventory),
+                 "localhost": ftl.localhost,
+                 "modules": modules,
+                 "user_input": {},
+                 "gate": None,
+                 "loop": None,
+                 "gate_cache": None,
+                 "log": None,
+                 "console": console,
+                 "questions": [],
+                }
+        user_contexts[request.session_hash] = Bunch(state=state, inventory=inventory)
         return (
             f"Welcome, {request.username}!",
             data.get("title"),
@@ -238,6 +250,7 @@ def launch(model, tool_classes, modules):
             data.get("python_code"),
             data.get("playbook_code"),
             data.get("inventory_text"),
+            data.get("tool_check_boxes"),
         )
 
     def cleanup(request: gr.Request):
@@ -416,6 +429,9 @@ def launch(model, tool_classes, modules):
                     @gr.render(inputs=current_question_input)
                     def render_form(request: gr.Request, *args, **kwargs):
 
+                        if request.session_hash not in user_contexts:
+                            return
+
                         context = user_contexts[request.session_hash]
                         print("render_form")
                         print(args)
@@ -554,6 +570,7 @@ def launch(model, tool_classes, modules):
                 python_code,
                 playbook_code,
                 inventory_text,
+                tool_check_boxes,
             ],
         )
         demo.unload(cleanup)
