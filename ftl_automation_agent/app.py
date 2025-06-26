@@ -244,9 +244,14 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
         os.makedirs(workspace, exist_ok=True)
         os.makedirs(outputs, exist_ok=True)
         inventory = os.path.join(workspace, "inventory.yml")
+        if not os.path.exists(inventory):
+            with open(inventory, 'w') as f:
+                f.write(yaml.dump({}))
+
         workspace_files = glob.glob(os.path.join(workspace, "*"))
         state = {
             "inventory": ftl.load_inventory(inventory),
+            "inventory_file": inventory,
             "localhost": ftl.localhost,
             "modules": modules_resolved,
             "user_input": {},
@@ -257,6 +262,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
             "console": console,
             "questions": [],
             "workspace": workspace,
+            "secrets": os.environ,
         }
         user_contexts[request.session_hash] = Bunch(
             state=state,
