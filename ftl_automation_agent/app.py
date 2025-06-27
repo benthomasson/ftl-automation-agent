@@ -106,9 +106,10 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
     SECRET_KEY = os.environ["SECRET_KEY"]
     app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 
-    def bot(prompt, messages, system_design, tools, request: gr.Request):
+    def bot(prompt, messages, playbook_name, system_design, tools, request: gr.Request):
         print(f"{prompt=}")
         print(f"{messages=}")
+        print(f"{playbook_name=}")
         print(f"{system_design=}")
         print(f"{tools=}")
         print(f"{request=}")
@@ -123,22 +124,27 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
             tools=[get_tool(tool_classes, t, context.state) for t in tools],
             model=model,
         )
-        context.output = os.path.join(context.outputs, f"output-{time.time}.py")
-        context.explain = os.path.join(context.outputs, f"output-{time.time}.txt")
-        context.playbook = os.path.join(context.outputs, f"output-{time.time}.yml")
+
+        playbook_prefix, _ = os.path.splitext(playbook_name)
+        timestamp = time.time()
+        context.output = os.path.join(context.outputs, f"{playbook_prefix}-{timestamp}.py")
+        context.explain = os.path.join(context.outputs, f"{playbook_prefix}-{timestamp}.txt")
+        context.playbook = os.path.join(context.outputs, f"{playbook_prefix}-{timestamp}.yml")
         context.user_input = os.path.join(
-            context.outputs, f"user_input-{time.time}.yml"
+            context.outputs, f"user_input-{timestamp}.yml"
         )
+        user_input_file = os.path.basename(context.user_input)
+        inventory_file = os.path.basename(context.inventory)
         generate_python_header(
             context.output,
             system_design,
             prompt,
             tools_files,
             tools,
-            context.inventory,
+            inventory_file,
             modules,
             {},  # context.extra_vars,
-            context.user_input,
+            user_input_file,
         )
         generate_explain_header(context.explain, system_design, full_prompt)
         generate_playbook_header(context.playbook, system_design, prompt)
@@ -278,6 +284,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
             data.get("chat"),
             data.get("python_code"),
             data.get("playbook_code"),
+            data.get("playbook_name"),
             data.get("inventory_text"),
             data.get("tool_check_boxes"),
             workspace_files,
@@ -311,6 +318,9 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
     def persist_playbook_code(request: gr.Request, playbook_code):
         persistent_sessions[request.session_hash]["playbook_code"] = playbook_code
 
+    def persist_playbook_name(request: gr.Request, playbook_name):
+        persistent_sessions[request.session_hash]["playbook_name"] = playbook_name
+
     def persist_inventory_text(request: gr.Request, inventory_text):
         persistent_sessions[request.session_hash]["inventory_text"] = inventory_text
 
@@ -321,7 +331,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
         context = user_contexts[request.session_hash]
         context.state["questions"] = []
         context.state["user_input"] = {}
-        return data["title"], data["system_design"], None, None, None, None, None
+        return data["title"], data["system_design"], None, None, None, None, "playbook.yml", None
 
     def render_left_bar():
 
@@ -399,6 +409,8 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
             python_code = gr.Code(
                 render=False, label="FTL Automation", language="python", visible=True
             )
+            playbook_name = gr.Textbox(label="Playbook Name:", value="playbook.yml", render=False)
+            playbook_name.change(persist_playbook_name, inputs=[playbook_name])
             python_code.change(persist_python_code, inputs=[python_code])
             playbook_code = gr.Code(
                 render=False, label="Ansible playbook", language="yaml", visible=True
@@ -438,6 +450,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
                         type="messages",
                         chatbot=chatbot,
                         additional_inputs=[
+                            playbook_name,
                             system_design_field,
                             tool_check_boxes,
                         ],
@@ -547,10 +560,17 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
                     gr.Timer(1).tick(fn=update_inventory, outputs=inventory_text)
 
                     # python_code.render()
+                    # playbook_name.render()
                     playbook_code.render()
                     inventory_text.render()
 
         workspace_files = render_workspace()
+
+        with gr.Tab("Documents"):
+            pass
+
+        with gr.Tab("Planning"):
+            pass
 
         clear_session_btn.click(
             clear_session,
@@ -562,6 +582,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
                 chatbot,
                 python_code,
                 playbook_code,
+                playbook_name,
                 inventory_text,
             ],
         )
@@ -576,6 +597,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
                 chatbot,
                 python_code,
                 playbook_code,
+                playbook_name,
                 inventory_text,
                 tool_check_boxes,
                 workspace_files,
