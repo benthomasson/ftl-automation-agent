@@ -572,6 +572,9 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
         with gr.Tab("Planning"):
             pass
 
+        with gr.Tab("Secrets"):
+            pass
+
         clear_session_btn.click(
             clear_session,
             inputs=None,
