@@ -38,6 +38,8 @@ import uvicorn
 
 from pprint import pprint
 
+from collections import UserDict
+
 
 console = Console()
 
@@ -77,6 +79,18 @@ def save_session(sub, data):
     os.makedirs(os.path.dirname(session_file_name), exist_ok=True)
     with open(session_file_name, "w") as f:
         f.write(json.dumps(data))
+
+
+class SecretsView(UserDict):
+
+    def __init__(self, secrets):
+        self.secrets = secrets
+
+    def __getitem__(self, key):
+        for k, v in self.secrets:
+            if key == k:
+                return v
+        raise KeyError(key)
 
 
 def launch(model, tool_classes, tools_files, modules_resolved, modules):
@@ -127,9 +141,15 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
 
         playbook_prefix, _ = os.path.splitext(playbook_name)
         timestamp = time.time()
-        context.output = os.path.join(context.outputs, f"{playbook_prefix}-{timestamp}.py")
-        context.explain = os.path.join(context.outputs, f"{playbook_prefix}-{timestamp}.txt")
-        context.playbook = os.path.join(context.outputs, f"{playbook_prefix}-{timestamp}.yml")
+        context.output = os.path.join(
+            context.outputs, f"{playbook_prefix}-{timestamp}.py"
+        )
+        context.explain = os.path.join(
+            context.outputs, f"{playbook_prefix}-{timestamp}.txt"
+        )
+        context.playbook = os.path.join(
+            context.outputs, f"{playbook_prefix}-{timestamp}.yml"
+        )
         context.user_input = os.path.join(
             context.outputs, f"user_input-{timestamp}.yml"
         )
@@ -243,6 +263,8 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
         pprint(request.request.session["user"])
         sub = request.request.session["user"]["sub"]
         data = load_session(sub)
+        if "secrets" not in data:
+            data["secrets"] = []
         pprint(data)
         persistent_sessions[request.session_hash] = data
         workspace = os.path.join("/workspace", sub)
@@ -251,10 +273,11 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
         os.makedirs(outputs, exist_ok=True)
         inventory = os.path.join(workspace, "inventory.yml")
         if not os.path.exists(inventory):
-            with open(inventory, 'w') as f:
+            with open(inventory, "w") as f:
                 f.write(yaml.dump({}))
 
         workspace_files = glob.glob(os.path.join(workspace, "*"))
+        secrets = data.get("secrets", [])
         state = {
             "inventory": ftl.load_inventory(inventory),
             "inventory_file": inventory,
@@ -268,7 +291,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
             "console": console,
             "questions": [],
             "workspace": workspace,
-            "secrets": os.environ,
+            "secrets": SecretsView(secrets),
         }
         user_contexts[request.session_hash] = Bunch(
             state=state,
@@ -288,17 +311,22 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
             data.get("inventory_text"),
             data.get("tool_check_boxes"),
             workspace_files,
+            secrets,
         )
 
-    def cleanup(request: gr.Request):
-        print("cleanup")
+    def persist_all(request: gr.Request):
+        print("persist_all")
         if request.session_hash in persistent_sessions:
             pprint(persistent_sessions[request.session_hash])
             save_session(
                 request.request.session["user"]["sub"],
                 persistent_sessions[request.session_hash],
             )
-            del persistent_sessions[request.session_hash]
+
+    def cleanup(request: gr.Request):
+        print("cleanup")
+        persist_all(request)
+        del persistent_sessions[request.session_hash]
 
     def persist_title_input(request: gr.Request, title):
         persistent_sessions[request.session_hash]["title"] = title
@@ -331,7 +359,16 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
         context = user_contexts[request.session_hash]
         context.state["questions"] = []
         context.state["user_input"] = {}
-        return data["title"], data["system_design"], None, None, None, None, "playbook.yml", None
+        return (
+            data["title"],
+            data["system_design"],
+            None,
+            None,
+            None,
+            None,
+            "playbook.yml",
+            None,
+        )
 
     def render_left_bar():
 
@@ -409,7 +446,9 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
             python_code = gr.Code(
                 render=False, label="FTL Automation", language="python", visible=True
             )
-            playbook_name = gr.Textbox(label="Playbook Name:", value="playbook.yml", render=False)
+            playbook_name = gr.Textbox(
+                label="Playbook Name:", value="playbook.yml", render=False
+            )
             playbook_name.change(persist_playbook_name, inputs=[playbook_name])
             python_code.change(persist_python_code, inputs=[python_code])
             playbook_code = gr.Code(
@@ -572,8 +611,65 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
         with gr.Tab("Planning"):
             pass
 
+        def persist_secret(secret_state, key_text, value_text, request: gr.Request):
+            print(f"{secret_state=} {key_text=} {value_text=}")
+            persistent_sessions[request.session_hash]["secrets"][secret_state] = [
+                key_text,
+                value_text,
+            ]
+            persist_all(request)
+
         with gr.Tab("Secrets"):
-            pass
+            with gr.Row():
+                with gr.Column(scale=2):
+                    current_secrets = gr.Textbox(visible=False)
+
+                    @gr.render(inputs=current_secrets)
+                    def render_current_secrets(user_msg, request: gr.Request):
+                        for i, (key, value) in enumerate(
+                            persistent_sessions[request.session_hash]["secrets"]
+                        ):
+                            with gr.Row():
+                                secret_state = gr.State(i)
+                                key_text = gr.Textbox(
+                                    type="text", value=key, show_label=False
+                                )
+                                value_text = gr.Textbox(
+                                    type="password", value=value, show_label=False
+                                )
+                                key_text.change(
+                                    persist_secret,
+                                    inputs=[secret_state, key_text, value_text],
+                                )
+                                value_text.change(
+                                    persist_secret,
+                                    inputs=[secret_state, key_text, value_text],
+                                )
+
+                    with gr.Row():
+                        add_btn = gr.Button("➕ Add New Pair", variant="primary")
+                        clear_all_btn = gr.Button("🗑️n Clear All", variant="secondary")
+
+            def add_secret(request: gr.Request):
+                print("add_secret")
+                #if "secrets" not in persistent_sessions[request.session_hash]:
+                #    persistent_sessions[request.session_hash]["secrets"] = []
+                persistent_sessions[request.session_hash]["secrets"].append(["", ""])
+                print(persistent_sessions[request.session_hash]["secrets"])
+                return gr.update(
+                    value=persistent_sessions[request.session_hash]["secrets"]
+                )
+
+            def clear_secrets(request: gr.Request):
+                print("add_secret")
+                #if "secrets" not in persistent_sessions[request.session_hash]:
+                #    persistent_sessions[request.session_hash]["secrets"] = []
+                persistent_sessions[request.session_hash]["secrets"].clear()
+                print(persistent_sessions[request.session_hash]["secrets"])
+                return gr.update(value=[])
+
+            add_btn.click(add_secret, inputs=None, outputs=[current_secrets])
+            clear_all_btn.click(clear_secrets, inputs=None, outputs=[current_secrets])
 
         clear_session_btn.click(
             clear_session,
@@ -604,6 +700,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
                 inventory_text,
                 tool_check_boxes,
                 workspace_files,
+                current_secrets,
             ],
         )
         demo.unload(cleanup)
