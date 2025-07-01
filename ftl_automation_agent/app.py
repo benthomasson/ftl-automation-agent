@@ -254,7 +254,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
         request.session["user"] = dict(access_token)["userinfo"]
         return RedirectResponse(url="/")
 
-    with gr.Blocks() as login_demo:
+    with gr.Blocks(title="Welcome to FTL") as login_demo:
         gr.Button("Login", link="/login")
 
     app = gr.mount_gradio_app(app, login_demo, path="/login-ftl")
@@ -436,7 +436,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
 
         return workspace_files
 
-    with gr.Blocks(fill_height=True) as demo:
+    with gr.Blocks(fill_height=True, title="FTL") as demo:
 
         title, clear_session_btn = render_left_bar()
         welcome = render_right_bar()
