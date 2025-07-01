@@ -368,6 +368,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
             None,
             "playbook.yml",
             None,
+            [],
         )
 
     def render_left_bar():
@@ -627,7 +628,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
                     @gr.render(inputs=current_secrets)
                     def render_current_secrets(user_msg, request: gr.Request):
                         for i, (key, value) in enumerate(
-                            persistent_sessions[request.session_hash]["secrets"]
+                            persistent_sessions[request.session_hash].get("secrets", [])
                         ):
                             with gr.Row():
                                 secret_state = gr.State(i)
@@ -683,6 +684,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
                 playbook_code,
                 playbook_name,
                 inventory_text,
+                current_secrets,
             ],
         )
         demo.load(
