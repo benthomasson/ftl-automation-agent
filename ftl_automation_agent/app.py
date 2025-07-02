@@ -360,7 +360,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
         context = user_contexts[request.session_hash]
         context.state["questions"] = []
         context.state["user_input"] = {}
-        with open(context.inventory, 'w') as f:
+        with open(context.inventory, "w") as f:
             f.write(json.dumps({}))
         return (
             data["title"],
@@ -440,10 +440,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
 
         return workspace_files
 
-    with gr.Blocks(fill_height=True, title="FTL") as demo:
-
-        title, clear_session_btn = render_left_bar()
-        welcome = render_right_bar()
+    def render_agent():
 
         with gr.Tab("Agent"):
 
@@ -606,20 +603,34 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
                     # playbook_name.render()
                     playbook_code.render()
                     inventory_text.render()
+        return (
+            system_design_field,
+            current_question_input,
+            chatbot,
+            python_code,
+            playbook_code,
+            playbook_name,
+            tool_check_boxes,
+            inventory_text,
+        )
 
-        workspace_files = render_workspace()
-
+    def render_automation():
         with gr.Tab("Automation"):
             pass
 
+    def render_topology():
         with gr.Tab("Topology"):
             pass
 
+    def render_documents():
         with gr.Tab("Documents"):
             pass
 
+    def render_planning():
         with gr.Tab("Planning"):
             pass
+
+    def render_secrets():
 
         def persist_secret(secret_state, key_text, value_text, request: gr.Request):
             print(f"{secret_state=} {key_text=} {value_text=}")
@@ -662,7 +673,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
 
             def add_secret(request: gr.Request):
                 print("add_secret")
-                #if "secrets" not in persistent_sessions[request.session_hash]:
+                # if "secrets" not in persistent_sessions[request.session_hash]:
                 #    persistent_sessions[request.session_hash]["secrets"] = []
                 persistent_sessions[request.session_hash]["secrets"].append(["", ""])
                 print(persistent_sessions[request.session_hash]["secrets"])
@@ -672,7 +683,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
 
             def clear_secrets(request: gr.Request):
                 print("add_secret")
-                #if "secrets" not in persistent_sessions[request.session_hash]:
+                # if "secrets" not in persistent_sessions[request.session_hash]:
                 #    persistent_sessions[request.session_hash]["secrets"] = []
                 persistent_sessions[request.session_hash]["secrets"].clear()
                 print(persistent_sessions[request.session_hash]["secrets"])
@@ -680,6 +691,31 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
 
             add_btn.click(add_secret, inputs=None, outputs=[current_secrets])
             clear_all_btn.click(clear_secrets, inputs=None, outputs=[current_secrets])
+
+        return current_secrets
+
+    with gr.Blocks(fill_height=True, title="FTL") as demo:
+
+        title, clear_session_btn = render_left_bar()
+        welcome = render_right_bar()
+
+        (
+            system_design_field,
+            current_question_input,
+            chatbot,
+            python_code,
+            playbook_code,
+            playbook_name,
+            tool_check_boxes,
+            inventory_text,
+        ) = render_agent()
+
+        workspace_files = render_workspace()
+        render_automation()
+        render_topology()
+        render_planning()
+        render_documents()
+        current_secrets = render_secrets()
 
         clear_session_btn.click(
             clear_session,
