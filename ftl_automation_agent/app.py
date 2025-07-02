@@ -354,11 +354,14 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
 
     def clear_session(request: gr.Request):
         print("clear_session")
-        data = {"title": "Session", "system_design": ""}
+        secrets = persistent_sessions[request.session_hash].get("secrets", [])
+        data = {"title": "Session", "system_design": "", "secrets": secrets}
         persistent_sessions[request.session_hash] = data
         context = user_contexts[request.session_hash]
         context.state["questions"] = []
         context.state["user_input"] = {}
+        with open(context.inventory, 'w') as f:
+            f.write(json.dumps({}))
         return (
             data["title"],
             data["system_design"],
@@ -368,7 +371,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
             None,
             "playbook.yml",
             None,
-            [],
+            secrets,
         )
 
     def render_left_bar():
@@ -605,6 +608,12 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
                     inventory_text.render()
 
         workspace_files = render_workspace()
+
+        with gr.Tab("Automation"):
+            pass
+
+        with gr.Tab("Topology"):
+            pass
 
         with gr.Tab("Documents"):
             pass
