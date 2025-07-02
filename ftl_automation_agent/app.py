@@ -64,8 +64,8 @@ This is a real scenario.  Use the tools provided or ask for assistance.
 """
 
 
-def load_session(sub):
-    session_file_name = f"/sessions/{sub}/session.json"
+def load_sessions(sub):
+    session_file_name = os.path.join("/sessions", sub, "sessions.json")
     if os.path.exists(session_file_name):
         with open(session_file_name) as f:
             data = json.loads(f.read())
@@ -74,8 +74,25 @@ def load_session(sub):
         return {}
 
 
-def save_session(sub, data):
-    session_file_name = f"/sessions/{sub}/session.json"
+def load_session(sub, i):
+    session_file_name = os.path.join("/sessions", sub, str(i), "session.json")
+    if os.path.exists(session_file_name):
+        with open(session_file_name) as f:
+            data = json.loads(f.read())
+        return data
+    else:
+        return {}
+
+
+def save_session(sub, i, data):
+    session_file_name = os.path.join("/sessions", sub, str(i), "session.json")
+    os.makedirs(os.path.dirname(session_file_name), exist_ok=True)
+    with open(session_file_name, "w") as f:
+        f.write(json.dumps(data))
+
+
+def save_sessions(sub, data):
+    session_file_name = os.path.join("/sessions", sub, "sessions.json")
     os.makedirs(os.path.dirname(session_file_name), exist_ok=True)
     with open(session_file_name, "w") as f:
         f.write(json.dumps(data))
@@ -97,6 +114,8 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
 
     app = FastAPI()
 
+    current_sessions = defaultdict(dict)
+    session_histories = defaultdict(dict)
     persistent_sessions = defaultdict(dict)
     user_contexts = dict()
 
@@ -262,13 +281,17 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
     def initialize(request: gr.Request):
         pprint(request.request.session["user"])
         sub = request.request.session["user"]["sub"]
-        data = load_session(sub)
+        sessions = load_sessions(sub)
+        current_session = sessions.get("current_session", 0)
+        current_sessions[request.session_hash] = current_session
+        session_histories[request.session_hash] = sessions.get("session_history", [])
+        data = load_session(sub, current_session)
         if "secrets" not in data:
             data["secrets"] = []
         pprint(data)
         persistent_sessions[request.session_hash] = data
-        workspace = os.path.join("/workspace", sub)
-        outputs = os.path.join("/outputs", sub)
+        workspace = os.path.join("/workspace", sub, str(current_session))
+        outputs = os.path.join("/outputs", sub, str(current_session))
         os.makedirs(workspace, exist_ok=True)
         os.makedirs(outputs, exist_ok=True)
         inventory = os.path.join(workspace, "inventory.yml")
@@ -318,8 +341,10 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
         print("persist_all")
         if request.session_hash in persistent_sessions:
             pprint(persistent_sessions[request.session_hash])
+            current_session = current_sessions.get(request.session_hash, 0)
             save_session(
                 request.request.session["user"]["sub"],
+                current_session,
                 persistent_sessions[request.session_hash],
             )
 
@@ -351,6 +376,16 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
 
     def persist_inventory_text(request: gr.Request, inventory_text):
         persistent_sessions[request.session_hash]["inventory_text"] = inventory_text
+
+    def new_session(sessions, request: gr.Request):
+        current_session = current_sessions.get(request.session_hash, 0)
+        next_session = current_session + 1
+        current_sessions[request.session_hash] = next_session
+        sessions = session_histories.get(request.session_hash, [])
+        sessions.append([persistent_sessions[request.session_hash]["title"]])
+        return gr.Dataset(
+                    samples=sessions,
+                )
 
     def clear_session(request: gr.Request):
         print("clear_session")
@@ -386,16 +421,23 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
                     scale=0,
                 )
                 title.change(persist_title_input, inputs=[title])
-                clear_session_btn = gr.Button("Clear", scale=0)
-                gr.Button(
-                    "New",
+                clear_session_btn = gr.Button("🗑️ Clear session", scale=0)
+                new_session_btn = gr.Button(
+                    "New session",
                     scale=0,
                     variant="primary",
                     icon=gr.utils.get_icon_path("plus.svg"),
-                    visible=False,
+                    visible=True,
+                )
+                session_list = gr.Dataset(
+                    samples=["1", "2"],
+                    components=[gr.Textbox(visible=False)],
+                    show_label=False,
+                    layout="table",
+                    type="index",
                 )
 
-        return title, clear_session_btn
+        return title, clear_session_btn, new_session_btn, session_list
 
     def render_right_bar():
 
@@ -669,7 +711,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
 
                     with gr.Row():
                         add_btn = gr.Button("➕ Add New Pair", variant="primary")
-                        clear_all_btn = gr.Button("🗑️n Clear All", variant="secondary")
+                        clear_all_btn = gr.Button("🗑️Clear All", variant="secondary")
 
             def add_secret(request: gr.Request):
                 print("add_secret")
@@ -696,7 +738,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
 
     with gr.Blocks(fill_height=True, title="FTL") as demo:
 
-        title, clear_session_btn = render_left_bar()
+        title, clear_session_btn, new_session_btn, session_list = render_left_bar()
         welcome = render_right_bar()
 
         (
@@ -731,6 +773,12 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
                 inventory_text,
                 current_secrets,
             ],
+        )
+
+        new_session_btn.click(
+            new_session,
+            inputs=[session_list],
+            outputs=[session_list],
         )
         demo.load(
             initialize,
