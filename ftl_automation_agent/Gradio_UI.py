@@ -23,6 +23,7 @@
 import gradio as gr
 import re
 from .codegen import (
+    generate_python_task,
     generate_python_tool_call,
     generate_explain_action_step,
     generate_playbook_task,
@@ -239,6 +240,7 @@ def stream_to_gradio(
     agent,
     context,
     task: str,
+    prompt: str,
     reset_agent_memory: bool = False,
     additional_args: Optional[dict] = None,
 ):
@@ -252,10 +254,11 @@ def stream_to_gradio(
     ):
         if isinstance(step_log, ActionStep):
             generate_explain_action_step(context.explain, step_log)
+            generate_python_task(prompt, context.output, step_log)
             if step_log.tool_calls:
                 for call in step_log.tool_calls:
                     generate_python_tool_call(step_log, context.output, call)
-            generate_playbook_task(context.playbook, step_log, context.tool_classes)
+            generate_playbook_task(prompt, context.playbook, step_log, context.tool_classes)
         # Track tokens if model provides them
         if hasattr(agent.model, "last_input_token_count"):
             total_input_tokens += agent.model.last_input_token_count
@@ -271,7 +274,7 @@ def stream_to_gradio(
     # final_answer = step_log  # Last log is the run's final_answer
     # final_answer = handle_agent_output_types(final_answer)
 
-    yield gr.ChatMessage(role="assistant", content=f"**Completed**")
+    yield gr.ChatMessage(role="assistant", content="**Completed**")
 
 
 __all__ = ["stream_to_gradio"]

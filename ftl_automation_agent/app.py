@@ -159,18 +159,17 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
         )
 
         playbook_prefix, _ = os.path.splitext(playbook_name)
-        timestamp = time.time()
         context.output = os.path.join(
-            context.outputs, f"{playbook_prefix}-{timestamp}.py"
+            context.outputs, f"{playbook_prefix}.py"
         )
         context.explain = os.path.join(
-            context.outputs, f"{playbook_prefix}-{timestamp}.txt"
+            context.outputs, f"{playbook_prefix}.txt"
         )
         context.playbook = os.path.join(
-            context.outputs, f"{playbook_prefix}-{timestamp}.yml"
+            context.outputs, f"{playbook_prefix}.yml"
         )
         context.user_input = os.path.join(
-            context.outputs, f"user_input-{timestamp}.yml"
+            context.outputs, f"{playbook_prefix}-user_input.yml"
         )
         user_input_file = os.path.basename(context.user_input)
         inventory_file = os.path.basename(context.inventory)
@@ -211,7 +210,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
 
         messages = []
         for msg in stream_to_gradio(
-            agent, context, task=full_prompt, reset_agent_memory=False
+            agent, context, task=full_prompt, prompt=prompt, reset_agent_memory=False
         ):
             update_code()
             messages.append(msg)
@@ -300,6 +299,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
                 f.write(yaml.dump({}))
 
         workspace_files = glob.glob(os.path.join(workspace, "*"))
+        output_files = glob.glob(os.path.join(outputs, "*"))
         secrets = data.get("secrets", [])
         state = {
             "inventory": ftl.load_inventory(inventory),
@@ -335,6 +335,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
             data.get("tool_check_boxes"),
             workspace_files,
             secrets,
+            output_files,
         )
 
     def persist_all(request: gr.Request):
@@ -641,7 +642,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
                     )
                     gr.Timer(1).tick(fn=update_inventory, outputs=inventory_text)
 
-                    # python_code.render()
+                    python_code.render()
                     # playbook_name.render()
                     playbook_code.render()
                     inventory_text.render()
@@ -658,7 +659,9 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
 
     def render_automation():
         with gr.Tab("Automation"):
-            pass
+            output_files = gr.Files()
+
+        return output_files
 
     def render_topology():
         with gr.Tab("Topology"):
@@ -753,7 +756,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
         ) = render_agent()
 
         workspace_files = render_workspace()
-        render_automation()
+        output_files = render_automation()
         render_topology()
         render_planning()
         render_documents()
@@ -796,6 +799,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
                 tool_check_boxes,
                 workspace_files,
                 current_secrets,
+                output_files,
             ],
         )
         demo.unload(cleanup)

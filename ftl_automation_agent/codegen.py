@@ -16,8 +16,10 @@ def generate_python_header(
     user_input,
 ):
 
-    with open(output, "w") as f:
-        f.write("#!/usr/bin/env python3\n")
+    exists = os.path.exists(output)
+    with open(output, "a") as f:
+        if not exists:
+            f.write("#!/usr/bin/env python3\n")
         f.write(f'"""\nSystem Design: {system_design}\n')
         if problem:
             f.write(f"Problem:{problem}\n")
@@ -48,6 +50,13 @@ def generate_python_step_header(output, o):
             f.write(f"\n    # Error: {o.error.__class__.__name__} in this code block")
 
 
+def generate_python_task(prompt, output, o):
+    if o.model_output:
+        with open(output, "a") as f:
+            f.write(f"\n    # Step {o.step_number:2d}\n    # ")
+            f.write("\n    # ".join(prompt.strip().splitlines()))
+
+
 def generate_python_tool_call(o, output, call):
     if o.error:
         with open(output, "a") as f:
@@ -71,11 +80,12 @@ def generate_python_step_footer(output, o):
 
 
 def reformat_python(output):
+    os.system("isort --float-to-top " + output)
     os.system("black " + output)
 
 
 def generate_explain_header(explain, system_design, problem):
-    with open(explain, "w") as f:
+    with open(explain, "a") as f:
         f.write(f"System design: {system_design}\n\n")
         if problem:
             f.write(f"Problem: {problem}\n\n")
@@ -94,14 +104,16 @@ def generate_explain_action_step(explain, o):
 
 
 def generate_playbook_header(playbook, system_design, problem):
-    with open(playbook, "w") as f:
+    if os.path.exists(playbook):
+        return
+    with open(playbook, "a") as f:
         if not problem:
             problem = system_design
         header = {"name": problem, "hosts": "all", "gather_facts": False, "tasks": []}
         f.write(yaml.dump([header]))
 
 
-def generate_playbook_task(playbook, o, tools):
+def generate_playbook_task(problem, playbook, o, tools):
     if not o.trace:
         return
     with open(playbook, "r") as f:
@@ -115,7 +127,7 @@ def generate_playbook_task(playbook, o, tools):
         if name in ["complete", "input", "user_input", "gradio_input"]:
             continue
         kwargs = fn["kwargs"]
-        data[0]["tasks"].append({name: kwargs})
+        data[0]["tasks"].append({"name": problem.strip(), name: kwargs})
     with open(playbook, "w") as f:
         try:
             f.write(yaml.dump(data))
