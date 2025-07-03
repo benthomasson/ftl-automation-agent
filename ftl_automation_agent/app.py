@@ -277,14 +277,23 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
         workspace_files = glob.glob(os.path.join(workspace, "*"))
         return workspace_files
 
+    def get_output_files(request: gr.Request):
+        sub = request.request.session["user"]["sub"]
+        current_session = current_sessions[request.session_hash]
+        outputs = os.path.join("/outputs", sub, str(current_session))
+        output_files = glob.glob(os.path.join(outputs, "*"))
+        return output_files
+
     def initialize(request: gr.Request):
         pprint(request.request.session["user"])
         sub = request.request.session["user"]["sub"]
-        sessions = load_sessions(sub)
-        current_session = sessions.get("current_session", 0)
+        sessions_data = load_sessions(sub)
+        current_session = sessions_data.get("current_session", 0)
         current_sessions[request.session_hash] = current_session
-        session_histories[request.session_hash] = sessions.get("session_history", [])
         data = load_session(sub, current_session)
+        sessions = session_histories[request.session_hash] = sessions_data.get(
+            "session_history", [[data.get("title", f"Session {current_session}")]]
+        )
         if "secrets" not in data:
             data["secrets"] = []
         pprint(data)
@@ -321,10 +330,14 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
             inventory=inventory,
             outputs=outputs,
             tool_classes=tool_classes,
+            workspace=workspace,
         )
         return (
+            gr.Dataset(
+                samples=sessions,
+            ),
             f"Welcome, {request.username}!",
-            data.get("title"),
+            data.get("title", f"Session {current_session}"),
             data.get("system_design"),
             data.get("user_input"),
             data.get("chat"),
@@ -378,20 +391,48 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
     def persist_inventory_text(request: gr.Request, inventory_text):
         persistent_sessions[request.session_hash]["inventory_text"] = inventory_text
 
+    def get_sessions(request: gr.Request):
+        return session_histories.get(request.session_hash, [])
+
     def new_session(sessions, request: gr.Request):
+
+        (
+            title,
+            system_design_field,
+            current_question_input,
+            chatbot,
+            python_code,
+            playbook_code,
+            playbook_name,
+            inventory_text,
+            current_secrets,
+        ) = clear_session("", request)
         current_session = current_sessions.get(request.session_hash, 0)
         next_session = current_session + 1
         current_sessions[request.session_hash] = next_session
         sessions = session_histories.get(request.session_hash, [])
-        sessions.append([persistent_sessions[request.session_hash]["title"]])
-        return gr.Dataset(
-            samples=sessions,
-        )
+        title = f"Session {next_session}"
+        sessions.insert(0, [title])
+        return [
+            gr.Dataset(
+                samples=sessions,
+            ),
+            title,
+            system_design_field,
+            current_question_input,
+            chatbot,
+            python_code,
+            playbook_code,
+            playbook_name,
+            inventory_text,
+            current_secrets,
+        ]
 
-    def clear_session(request: gr.Request):
+    def clear_session(title, request: gr.Request):
         print("clear_session")
         secrets = persistent_sessions[request.session_hash].get("secrets", [])
-        data = {"title": "Session", "system_design": "", "secrets": secrets}
+        current_session = current_sessions.get(request.session_hash, 0)
+        data = {"title": title, "system_design": "", "secrets": secrets}
         persistent_sessions[request.session_hash] = data
         context = user_contexts[request.session_hash]
         context.state["questions"] = []
@@ -431,7 +472,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
                     visible=True,
                 )
                 session_list = gr.Dataset(
-                    samples=["1", "2"],
+                    samples=[],
                     components=[gr.Textbox(visible=False)],
                     show_label=False,
                     layout="table",
@@ -668,8 +709,18 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
         )
 
     def render_automation():
-        with gr.Tab("Automation"):
-            output_files = gr.Files()
+        automation = gr.Tab("Automation")
+
+        with automation:
+            output_files = gr.Files(interactive=False)
+
+        def automation_selected(output_files, request: gr.Request):
+            output_files = get_output_files(request)
+            return output_files
+
+        automation.select(
+            automation_selected, inputs=[output_files], outputs=[output_files]
+        )
 
         return output_files
 
@@ -749,9 +800,26 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
 
         return current_secrets
 
+    def title_input(title, request: gr.Request):
+
+        sessions = get_sessions(request)
+
+        if len(sessions) == 0:
+            return gr.Dataset(
+                samples=sessions,
+            )
+
+        sessions[0][0] = title
+
+        return gr.Dataset(
+            samples=sessions,
+        )
+
     with gr.Blocks(fill_height=True, title="FTL") as demo:
 
         title, clear_session_btn, new_session_btn, session_list = render_left_bar()
+        title.input(title_input, inputs=[title], outputs=[session_list])
+
         welcome = render_right_bar()
 
         (
@@ -774,7 +842,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
 
         clear_session_btn.click(
             clear_session,
-            inputs=None,
+            inputs=[title],
             outputs=[
                 title,
                 system_design_field,
@@ -791,12 +859,24 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
         new_session_btn.click(
             new_session,
             inputs=[session_list],
-            outputs=[session_list],
+            outputs=[
+                session_list,
+                title,
+                system_design_field,
+                current_question_input,
+                chatbot,
+                python_code,
+                playbook_code,
+                playbook_name,
+                inventory_text,
+                current_secrets,
+            ],
         )
         demo.load(
             initialize,
             inputs=None,
             outputs=[
+                session_list,
                 welcome,
                 title,
                 system_design_field,
