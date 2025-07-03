@@ -20,25 +20,24 @@ def generate_python_header(
     with open(output, "a") as f:
         if not exists:
             f.write("#!/usr/bin/env python3\n")
-        f.write(f'"""\nSystem Design: {system_design}\n')
-        if problem:
-            f.write(f"Problem:{problem}\n")
-        f.write('"""\n')
-        f.write("import ftl_automation_agent\n")
-        f.write("import os\n\n\n")
-        f.write("with ftl_automation_agent.automation(\n")
-        f.write(f"tools_files={tools_files},\n")
-        f.write(f"tools={tools},\n")
-        f.write(f"inventory='{inventory}',\n")
-        f.write(f"modules={modules},\n")
-        f.write(f"user_input='{user_input}',\n")
-        for e in extra_vars:
-            e, _, _ = e.partition("=")
-            f.write(f"{e.lower()} = os.environ['{e.upper()}'],\n")
-        f.write(") as ftl:\n\n")
-
-        for t in tools:
-            f.write(f"    {t} = ftl.tools.{t}\n")
+            f.write(f'"""\nSystem Design: {system_design}\n')
+            if problem:
+                f.write(f"Problem:{problem}\n")
+            f.write('"""\n')
+            f.write("import ftl_automation_agent\n")
+            f.write("import os\n\n\n")
+            f.write("with ftl_automation_agent.automation(\n")
+            f.write(f"tools_files={tools_files},\n")
+            f.write(f"tools={tools},\n")
+            f.write(f"inventory='{inventory}',\n")
+            f.write(f"modules={modules},\n")
+            f.write(f"user_input='{user_input}',\n")
+            for e in extra_vars:
+                e, _, _ = e.partition("=")
+                f.write(f"{e.lower()} = os.environ['{e.upper()}'],\n")
+            f.write(") as ftl:\n\n")
+            for t in tools:
+                f.write(f"    {t} = ftl.tools.{t}\n")
 
         f.write("\n")
 
