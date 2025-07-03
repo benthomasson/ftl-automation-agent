@@ -294,6 +294,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
         sessions = session_histories[request.session_hash] = sessions_data.get(
             "session_history", [[data.get("title", f"Session {current_session}")]]
         )
+        print(sessions)
         if "secrets" not in data:
             data["secrets"] = []
         pprint(data)
@@ -361,6 +362,14 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
                 current_session,
                 persistent_sessions[request.session_hash],
             )
+            sessions_data = {
+                "current_session": current_session,
+                "session_history": session_histories.get(request.session_hash, {}),
+            }
+            save_sessions(
+                request.request.session["user"]["sub"],
+                sessions_data,
+            )
 
     def cleanup(request: gr.Request):
         print("cleanup")
@@ -413,6 +422,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
         sessions = session_histories.get(request.session_hash, [])
         title = f"Session {next_session}"
         sessions.insert(0, [title])
+        persist_all(request)
         return [
             gr.Dataset(
                 samples=sessions,
@@ -431,7 +441,6 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
     def clear_session(title, request: gr.Request):
         print("clear_session")
         secrets = persistent_sessions[request.session_hash].get("secrets", [])
-        current_session = current_sessions.get(request.session_hash, 0)
         data = {"title": title, "system_design": "", "secrets": secrets}
         persistent_sessions[request.session_hash] = data
         context = user_contexts[request.session_hash]
@@ -439,6 +448,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
         context.state["user_input"] = {}
         with open(context.inventory, "w") as f:
             f.write(json.dumps({}))
+        persist_all(request)
         return (
             data["title"],
             data["system_design"],
