@@ -1,5 +1,4 @@
 import os
-import time
 
 import click
 import json
@@ -159,15 +158,9 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
         )
 
         playbook_prefix, _ = os.path.splitext(playbook_name)
-        context.output = os.path.join(
-            context.outputs, f"{playbook_prefix}.py"
-        )
-        context.explain = os.path.join(
-            context.outputs, f"{playbook_prefix}.txt"
-        )
-        context.playbook = os.path.join(
-            context.outputs, f"{playbook_prefix}.yml"
-        )
+        context.output = os.path.join(context.outputs, f"{playbook_prefix}.py")
+        context.explain = os.path.join(context.outputs, f"{playbook_prefix}.txt")
+        context.playbook = os.path.join(context.outputs, f"{playbook_prefix}.yml")
         context.user_input = os.path.join(
             context.outputs, f"{playbook_prefix}-user_input.yml"
         )
@@ -277,6 +270,13 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
 
     app = gr.mount_gradio_app(app, login_demo, path="/login-ftl")
 
+    def get_workspace_files(request: gr.Request):
+        sub = request.request.session["user"]["sub"]
+        current_session = current_sessions[request.session_hash]
+        workspace = os.path.join("/workspace", sub, str(current_session))
+        workspace_files = glob.glob(os.path.join(workspace, "*"))
+        return workspace_files
+
     def initialize(request: gr.Request):
         pprint(request.request.session["user"])
         sub = request.request.session["user"]["sub"]
@@ -385,8 +385,8 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
         sessions = session_histories.get(request.session_hash, [])
         sessions.append([persistent_sessions[request.session_hash]["title"]])
         return gr.Dataset(
-                    samples=sessions,
-                )
+            samples=sessions,
+        )
 
     def clear_session(request: gr.Request):
         print("clear_session")
@@ -475,11 +475,21 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
 
     def render_workspace():
 
-        with gr.Tab("Workspace"):
+        workspace = gr.Tab("Workspace")
+
+        with workspace:
             workspace_files = gr.Files()
             workspace_files.upload(upload_file, inputs=[workspace_files])
             workspace_files.delete(delete_file, inputs=[workspace_files])
             workspace_files.clear(clear_file, inputs=[workspace_files])
+
+        def workspace_selected(workspace_files, request: gr.Request):
+            workspace_files = get_workspace_files(request)
+            return workspace_files
+
+        workspace.select(
+            workspace_selected, inputs=[workspace_files], outputs=[workspace_files]
+        )
 
         return workspace_files
 
