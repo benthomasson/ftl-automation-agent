@@ -292,8 +292,10 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
         current_sessions[request.session_hash] = current_session
         data = load_session(sub, current_session)
         sessions = session_histories[request.session_hash] = sessions_data.get(
-            "session_history", [[data.get("title", f"Session {current_session}")]]
+            "session_history", []
         )
+        if len(sessions) == 0:
+            sessions.append([data.get("title", f"Session {current_session}")])
         print(sessions)
         if "secrets" not in data:
             data["secrets"] = []
@@ -374,7 +376,8 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
     def cleanup(request: gr.Request):
         print("cleanup")
         persist_all(request)
-        del persistent_sessions[request.session_hash]
+        if request.session_hash in persistent_sessions:
+            del persistent_sessions[request.session_hash]
 
     def persist_title_input(request: gr.Request, title):
         persistent_sessions[request.session_hash]["title"] = title
@@ -403,7 +406,12 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
     def get_sessions(request: gr.Request):
         return session_histories.get(request.session_hash, [])
 
-    def new_session(sessions, request: gr.Request):
+    def new_session(sessions, title, system_design_field, request: gr.Request):
+
+        current_session = current_sessions.get(request.session_hash, 0)
+        sessions = session_histories.get(request.session_hash, [])
+        if sessions:
+            sessions[0] = [title, system_design_field]
 
         (
             title,
@@ -416,12 +424,10 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
             inventory_text,
             current_secrets,
         ) = clear_session("", request)
-        current_session = current_sessions.get(request.session_hash, 0)
-        next_session = current_session + 1
-        current_sessions[request.session_hash] = next_session
-        sessions = session_histories.get(request.session_hash, [])
+        next_session = len(sessions)
+        current_sessions[request.session_hash] = 0
         title = f"Session {next_session}"
-        sessions.insert(0, [title])
+        sessions.insert(0, ([title]))
         persist_all(request)
         return [
             gr.Dataset(
@@ -461,6 +467,18 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
             secrets,
         )
 
+    def select_session(event: gr.SelectData, request: gr.Request):
+        current_session = current_sessions.get(request.session_hash, 0)
+        sessions = session_histories.get(request.session_hash, [])
+        print(event)
+        print(event.index)
+        print(event.value)
+        print(event.row_value)
+        print(event.col_value)
+        print(event.selected)
+        current_sessions[request.session_hash] = event.index
+        return event.value[0]
+
     def render_left_bar():
 
         with gr.Sidebar(position="left", open=False):
@@ -486,7 +504,8 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
                     components=[gr.Textbox(visible=False)],
                     show_label=False,
                     layout="table",
-                    type="index",
+                    type="tuple",
+                    samples_per_page=100,
                 )
 
         return title, clear_session_btn, new_session_btn, session_list
@@ -813,13 +832,14 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
     def title_input(title, request: gr.Request):
 
         sessions = get_sessions(request)
+        current_session = current_sessions[request.session_hash]
 
         if len(sessions) == 0:
             return gr.Dataset(
                 samples=sessions,
             )
 
-        sessions[0][0] = title
+        sessions[current_session][0] = title
 
         return gr.Dataset(
             samples=sessions,
@@ -850,6 +870,15 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
         render_documents()
         current_secrets = render_secrets()
 
+        session_list.select(
+            select_session,
+            inputs=None,
+            outputs=[title],
+            show_api=False,
+            queue=False,
+            show_progress="hidden",
+        )
+
         clear_session_btn.click(
             clear_session,
             inputs=[title],
@@ -864,11 +893,18 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
                 inventory_text,
                 current_secrets,
             ],
+            show_api=False,
+            queue=False,
+            show_progress="hidden",
         )
 
         new_session_btn.click(
             new_session,
-            inputs=[session_list],
+            inputs=[
+                session_list,
+                title,
+                system_design_field,
+            ],
             outputs=[
                 session_list,
                 title,
@@ -881,6 +917,9 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
                 inventory_text,
                 current_secrets,
             ],
+            show_api=False,
+            queue=False,
+            show_progress="hidden",
         )
         demo.load(
             initialize,
