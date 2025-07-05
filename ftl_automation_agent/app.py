@@ -290,13 +290,22 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
         sessions_data = load_sessions(sub)
         current_session = sessions_data.get("current_session", 0)
         current_sessions[request.session_hash] = current_session
-        data = load_session(sub, current_session)
         sessions = session_histories[request.session_hash] = sessions_data.get(
             "session_history", []
         )
+        data = load_session(sub, current_session)
         if len(sessions) == 0:
             sessions.append([data.get("title", f"Session {current_session}")])
-        print(sessions)
+        return start_session(request)
+
+    def start_session(request: gr.Request):
+        current_session = current_sessions[request.session_hash]
+        sub = request.request.session["user"]["sub"]
+        sessions_data = load_sessions(sub)
+        sessions = session_histories[request.session_hash] = sessions_data.get(
+            "session_history", []
+        )
+        data = load_session(sub, current_session)
         if "secrets" not in data:
             data["secrets"] = []
         pprint(data)
@@ -357,8 +366,9 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
     def persist_all(request: gr.Request):
         print("persist_all")
         if request.session_hash in persistent_sessions:
-            pprint(persistent_sessions[request.session_hash])
+            # pprint(persistent_sessions[request.session_hash])
             current_session = current_sessions.get(request.session_hash, 0)
+            print(f"{current_session=}")
             save_session(
                 request.request.session["user"]["sub"],
                 current_session,
@@ -408,11 +418,12 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
 
     def new_session(sessions, title, system_design_field, request: gr.Request):
 
-        current_session = current_sessions.get(request.session_hash, 0)
+        persist_all(request)
+        # current_session = current_sessions.get(request.session_hash, 0)
         sessions = session_histories.get(request.session_hash, [])
-        if sessions:
-            sessions[0] = [title, system_design_field]
 
+        next_session = len(sessions)
+        current_sessions[request.session_hash] = next_session
         (
             title,
             system_design_field,
@@ -424,10 +435,8 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
             inventory_text,
             current_secrets,
         ) = clear_session("", request)
-        next_session = len(sessions)
-        current_sessions[request.session_hash] = 0
         title = f"Session {next_session}"
-        sessions.insert(0, ([title]))
+        sessions.append([title])
         persist_all(request)
         return [
             gr.Dataset(
@@ -468,16 +477,15 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
         )
 
     def select_session(event: gr.SelectData, request: gr.Request):
-        current_session = current_sessions.get(request.session_hash, 0)
-        sessions = session_histories.get(request.session_hash, [])
         print(event)
         print(event.index)
         print(event.value)
         print(event.row_value)
         print(event.col_value)
         print(event.selected)
+        persist_all(request)
         current_sessions[request.session_hash] = event.index
-        return event.value[0]
+        return start_session(request)
 
     def render_left_bar():
 
@@ -873,7 +881,22 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
         session_list.select(
             select_session,
             inputs=None,
-            outputs=[title],
+            outputs=[
+                session_list,
+                welcome,
+                title,
+                system_design_field,
+                current_question_input,
+                chatbot,
+                python_code,
+                playbook_code,
+                playbook_name,
+                inventory_text,
+                tool_check_boxes,
+                workspace_files,
+                current_secrets,
+                output_files,
+            ],
             show_api=False,
             queue=False,
             show_progress="hidden",
