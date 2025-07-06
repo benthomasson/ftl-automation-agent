@@ -236,7 +236,7 @@ def pull_messages_from_step(
         yield gr.ChatMessage(role="assistant", content="-----")
 
 
-def stream_to_gradio(
+def agent_stream_to_gradio(
     agent,
     context,
     task: str,
@@ -259,6 +259,39 @@ def stream_to_gradio(
                 for call in step_log.tool_calls:
                     generate_python_tool_call(step_log, context.output, call)
             generate_playbook_task(prompt, context.playbook, step_log, context.tool_classes)
+        # Track tokens if model provides them
+        if hasattr(agent.model, "last_input_token_count"):
+            total_input_tokens += agent.model.last_input_token_count
+            total_output_tokens += agent.model.last_output_token_count
+            print(f"3. {type(step_log)=}")
+            if isinstance(step_log, ActionStep):
+                step_log.input_token_count = agent.model.last_input_token_count
+                step_log.output_token_count = agent.model.last_output_token_count
+
+        for message in pull_messages_from_step(step_log, context.tool_classes):
+            yield message
+
+    # final_answer = step_log  # Last log is the run's final_answer
+    # final_answer = handle_agent_output_types(final_answer)
+
+    yield gr.ChatMessage(role="assistant", content="**Completed**")
+
+
+def planning_stream_to_gradio(
+    agent,
+    context,
+    task: str,
+    reset_agent_memory: bool = False,
+    additional_args: Optional[dict] = None,
+):
+    """Runs an agent with the given task and streams the messages from the agent as gradio ChatMessages."""
+
+    total_input_tokens = 0
+    total_output_tokens = 0
+
+    for step_log in agent.run(
+        task, stream=True, reset=reset_agent_memory, additional_args=additional_args
+    ):
         # Track tokens if model provides them
         if hasattr(agent.model, "last_input_token_count"):
             total_input_tokens += agent.model.last_input_token_count

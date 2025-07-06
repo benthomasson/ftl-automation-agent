@@ -26,7 +26,7 @@ from .codegen import (
 from .util import resolve_modules_path_or_package
 
 from ftl_automation_agent.util import Bunch
-from ftl_automation_agent.Gradio_UI import stream_to_gradio
+from ftl_automation_agent.Gradio_UI import agent_stream_to_gradio, planning_stream_to_gradio
 
 from authlib.integrations.starlette_client import OAuth, OAuthError
 from fastapi import FastAPI, Depends, Request
@@ -138,7 +138,9 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
     SECRET_KEY = os.environ["SECRET_KEY"]
     app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 
-    def bot(prompt, messages, playbook_name, system_design, tools, request: gr.Request):
+    def agent_bot(
+        prompt, messages, playbook_name, system_design, tools, request: gr.Request
+    ):
         print(f"{prompt=}")
         print(f"{messages=}")
         print(f"{playbook_name=}")
@@ -202,7 +204,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
         update_code()
 
         messages = []
-        for msg in stream_to_gradio(
+        for msg in agent_stream_to_gradio(
             agent, context, task=full_prompt, prompt=prompt, reset_agent_memory=False
         ):
             update_code()
@@ -222,6 +224,33 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
         update_code()
 
         yield messages, python_output, playbook_output, inventory_text
+
+    def planning_bot(prompt, messages, request: gr.Request):
+
+        print(f"{prompt=}")
+        print(f"{messages=}")
+        print(f"{request=}")
+
+
+        context = user_contexts[request.session_hash]
+
+        if isinstance(prompt, dict):
+            prompt = prompt["text"]
+
+        tools = ['complete', 'impossible']
+
+        agent = make_agent(
+            tools=[get_tool(tool_classes, t, context.state) for t in tools],
+            model=model,
+        )
+
+        for msg in planning_stream_to_gradio(
+            agent, context, task=prompt, reset_agent_memory=False
+        ):
+            messages.append(msg)
+            yield messages
+
+        yield messages
 
     # Dependency to get the current user
     def get_user(request: Request):
@@ -376,7 +405,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
             )
             sessions_data = {
                 "current_session": current_session,
-                "session_history": session_histories.get(request.session_hash, {}),
+                "session_history": session_histories.get(request.session_hash, []),
             }
             save_sessions(
                 request.request.session["user"]["sub"],
@@ -428,7 +457,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
             title,
             system_design_field,
             current_question_input,
-            chatbot,
+            agent_chatbot,
             python_code,
             playbook_code,
             playbook_name,
@@ -445,7 +474,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
             title,
             system_design_field,
             current_question_input,
-            chatbot,
+            agent_chatbot,
             python_code,
             playbook_code,
             playbook_name,
@@ -609,17 +638,18 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
                         persist_tool_check_boxes, inputs=[tool_check_boxes]
                     )
 
-                    chatbot = gr.Chatbot(
+                    agent_chatbot = gr.Chatbot(
                         label="FTL Agent",
                         type="messages",
                         resizeable=True,
                         scale=1,
                     )
-                    chatbot.change(persist_chat, inputs=[chatbot])
+                    agent_chatbot.change(persist_chat, inputs=[agent_chatbot])
+
                     gr.ChatInterface(
-                        fn=bot,
+                        fn=agent_bot,
                         type="messages",
-                        chatbot=chatbot,
+                        chatbot=agent_chatbot,
                         additional_inputs=[
                             playbook_name,
                             system_design_field,
@@ -737,7 +767,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
         return (
             system_design_field,
             current_question_input,
-            chatbot,
+            agent_chatbot,
             python_code,
             playbook_code,
             playbook_name,
@@ -771,7 +801,23 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
 
     def render_planning():
         with gr.Tab("Planning"):
-            pass
+
+            planning_chatbot = gr.Chatbot(
+                placeholder="<strong>FTL Planning</strong><br>What do you want to build today?",
+                label="FTL Planning",
+                type="messages",
+                resizeable=True,
+                scale=1,
+            )
+            gr.ChatInterface(
+                fn=planning_bot,
+                type="messages",
+                chatbot=planning_chatbot,
+                textbox=gr.MultimodalTextbox(
+                    stop_btn=True,
+                ),
+                save_history=False,
+            )
 
     def render_secrets():
 
@@ -863,7 +909,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
         (
             system_design_field,
             current_question_input,
-            chatbot,
+            agent_chatbot,
             python_code,
             playbook_code,
             playbook_name,
@@ -887,7 +933,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
                 title,
                 system_design_field,
                 current_question_input,
-                chatbot,
+                agent_chatbot,
                 python_code,
                 playbook_code,
                 playbook_name,
@@ -909,7 +955,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
                 title,
                 system_design_field,
                 current_question_input,
-                chatbot,
+                agent_chatbot,
                 python_code,
                 playbook_code,
                 playbook_name,
@@ -933,7 +979,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
                 title,
                 system_design_field,
                 current_question_input,
-                chatbot,
+                agent_chatbot,
                 python_code,
                 playbook_code,
                 playbook_name,
@@ -953,7 +999,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
                 title,
                 system_design_field,
                 current_question_input,
-                chatbot,
+                agent_chatbot,
                 python_code,
                 playbook_code,
                 playbook_name,
