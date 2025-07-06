@@ -44,6 +44,7 @@ console = Console()
 
 
 TASK_PROMPT = """
+You are a task running agent.
 
 Use the gradio_input_tool to ask for additional information.
 Use the complete() tool to signal that you are done
@@ -59,6 +60,18 @@ Do not assume input values to the tools.  Ask the user.
 
 
 This is a real scenario.  Use the tools provided or ask for assistance.
+
+"""
+
+PLANNING_PROMPT = """
+
+You are a planning agent. You create plans for other agents to execute.
+You are working as a consultant engineer with a customer who wants to deploy
+some software.  Work collaboratively with them to plan how to deploy this
+system.  You are given some tools to help in your planning.
+
+Use the gradio_input_tool to ask for additional information.
+Use the complete() tool to signal that you are done
 
 """
 
@@ -237,7 +250,9 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
         if isinstance(prompt, dict):
             prompt = prompt["text"]
 
-        tools = ['complete', 'impossible']
+        full_prompt = PLANNING_PROMPT + prompt + "\nCall complete() when the customer is satified with the plan."
+
+        tools = ['complete', 'impossible', 'gradio_input_tool']
 
         agent = make_agent(
             tools=[get_tool(tool_classes, t, context.state) for t in tools],
@@ -245,7 +260,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
         )
 
         for msg in planning_stream_to_gradio(
-            agent, context, task=prompt, reset_agent_memory=False
+            agent, context, task=full_prompt, reset_agent_memory=False
         ):
             messages.append(msg)
             yield messages
@@ -906,6 +921,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
 
         welcome = render_right_bar()
 
+        render_planning()
         (
             system_design_field,
             current_question_input,
@@ -920,7 +936,6 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
         workspace_files = render_workspace()
         output_files = render_automation()
         render_topology()
-        render_planning()
         render_documents()
         current_secrets = render_secrets()
 
