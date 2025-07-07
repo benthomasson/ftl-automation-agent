@@ -4,6 +4,7 @@ import click
 import json
 import shutil
 import glob
+import time
 
 
 from collections import defaultdict
@@ -26,7 +27,10 @@ from .codegen import (
 from .util import resolve_modules_path_or_package
 
 from ftl_automation_agent.util import Bunch
-from ftl_automation_agent.Gradio_UI import agent_stream_to_gradio, planning_stream_to_gradio
+from ftl_automation_agent.Gradio_UI import (
+    agent_stream_to_gradio,
+    planning_stream_to_gradio,
+)
 
 from authlib.integrations.starlette_client import OAuth, OAuthError
 from fastapi import FastAPI, Depends, Request
@@ -71,7 +75,8 @@ some software.  Work collaboratively with them to plan how to deploy this
 system.  You are given some tools to help in your planning.
 
 Use the planning_input_tool to ask for additional information.
-Use the complete() tool to signal that you are done
+Use the plan_tool to propose a plan to the user.
+Use the approval_tool to ask for the user for approval of the plan.
 
 """
 
@@ -244,24 +249,36 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
         print(f"{messages=}")
         print(f"{request=}")
 
-
         context = user_contexts[request.session_hash]
 
         if isinstance(prompt, dict):
             prompt = prompt["text"]
 
-        full_prompt = PLANNING_PROMPT + prompt + "\nCall complete() when the customer is satified with the plan."
+        full_prompt = (
+            PLANNING_PROMPT
+            + prompt
+            + "\nCall complete() when the customer is satified with the plan."
+        )
 
-        tools = ['complete', 'impossible', 'planning_input_tool']
+        tools = ['complete', 'impossible', 'planning_input_tool', 'approval_tool', 'plan_tool']
 
         agent = make_agent(
             tools=[get_tool(tool_classes, t, context.state) for t in tools],
             model=model,
         )
 
+        prompt_id = f"planning_{time.time()}"
+
+        with open(f"/prompts/{prompt_id}.txt", "w") as f:
+            f.write(full_prompt)
+
+        os.makedirs(f"/prompts/{prompt_id}/responses/", exist_ok=True)
+
         for msg in planning_stream_to_gradio(
             agent, context, task=full_prompt, reset_agent_memory=False
         ):
+            with open(f"/prompts/{prompt_id}/responses/{time.time()}.txt", "w") as f:
+                f.write(msg.content)
             messages.append(msg)
             yield messages
 
@@ -816,28 +833,27 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
 
     def render_planning():
         with gr.Tab("Planning"):
-            with gr.Column():
+            with gr.Row():
 
-                planning_chatbot = gr.Chatbot(
-                    placeholder="<strong>FTL Planning</strong><br>What do you want to build today?",
-                    label="FTL Planning",
-                    type="messages",
-                    resizeable=True,
-                    scale=1,
-                )
-                gr.ChatInterface(
-                    fn=planning_bot,
-                    type="messages",
-                    chatbot=planning_chatbot,
-                    textbox=gr.MultimodalTextbox(
-                        stop_btn=True,
-                    ),
-                    save_history=False,
-                )
-
-            with gr.Column():
-
-                planning_question_input = gr.Textbox(visible=False)
+                with gr.Column():
+                    planning_chatbot = gr.Chatbot(
+                        placeholder="<strong>FTL Planning</strong><br>What do you want to build today?",
+                        label="FTL Planning",
+                        type="messages",
+                        resizeable=True,
+                        scale=1,
+                    )
+                    gr.ChatInterface(
+                        fn=planning_bot,
+                        type="messages",
+                        chatbot=planning_chatbot,
+                        textbox=gr.MultimodalTextbox(
+                            stop_btn=True,
+                        ),
+                        save_history=False,
+                    )
+                with gr.Column(scale=0):
+                    planning_question_input = gr.Textbox(visible=False)
 
 
     def render_secrets():
