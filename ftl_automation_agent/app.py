@@ -70,7 +70,7 @@ You are working as a consultant engineer with a customer who wants to deploy
 some software.  Work collaboratively with them to plan how to deploy this
 system.  You are given some tools to help in your planning.
 
-Use the gradio_input_tool to ask for additional information.
+Use the planning_input_tool to ask for additional information.
 Use the complete() tool to signal that you are done
 
 """
@@ -252,7 +252,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
 
         full_prompt = PLANNING_PROMPT + prompt + "\nCall complete() when the customer is satified with the plan."
 
-        tools = ['complete', 'impossible', 'gradio_input_tool']
+        tools = ['complete', 'impossible', 'planning_input_tool']
 
         agent = make_agent(
             tools=[get_tool(tool_classes, t, context.state) for t in tools],
@@ -816,23 +816,29 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
 
     def render_planning():
         with gr.Tab("Planning"):
+            with gr.Column():
 
-            planning_chatbot = gr.Chatbot(
-                placeholder="<strong>FTL Planning</strong><br>What do you want to build today?",
-                label="FTL Planning",
-                type="messages",
-                resizeable=True,
-                scale=1,
-            )
-            gr.ChatInterface(
-                fn=planning_bot,
-                type="messages",
-                chatbot=planning_chatbot,
-                textbox=gr.MultimodalTextbox(
-                    stop_btn=True,
-                ),
-                save_history=False,
-            )
+                planning_chatbot = gr.Chatbot(
+                    placeholder="<strong>FTL Planning</strong><br>What do you want to build today?",
+                    label="FTL Planning",
+                    type="messages",
+                    resizeable=True,
+                    scale=1,
+                )
+                gr.ChatInterface(
+                    fn=planning_bot,
+                    type="messages",
+                    chatbot=planning_chatbot,
+                    textbox=gr.MultimodalTextbox(
+                        stop_btn=True,
+                    ),
+                    save_history=False,
+                )
+
+            with gr.Column():
+
+                planning_question_input = gr.Textbox(visible=False)
+
 
     def render_secrets():
 

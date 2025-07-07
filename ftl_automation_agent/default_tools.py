@@ -110,10 +110,33 @@ class GradioUserInputTool(Tool):
         return self.state["user_input"][question]
 
 
+class PlanningUserInputTool(Tool):
+    name = "planning_input_tool"
+    description = "Asks for user's input on a specific question"
+    inputs = {
+        "question": {"type": "string", "description": "The question to ask the user"}
+    }
+    output_type = "string"
+    module = None
+
+    def __init__(self, state, *args, **kwargs):
+        self.state = state
+        super().__init__(*args, **kwargs)
+
+    def forward(self, question):
+        if question not in self.state["questions"]:
+            self.state["questions"].append(question)
+        while question not in self.state["user_input"]:
+            print(f'Waiting on user input for question: {question}')
+            time.sleep(1)
+        return self.state["user_input"][question]
+
+
 TOOLS = {
     "complete": Complete,
     "impossible": Impossible,
     "user_input_tool": UserInputTool,
     "input_tool": InputTool,
     "gradio_input_tool": GradioUserInputTool,
+    "planning_input_tool": PlanningUserInputTool,
 }
