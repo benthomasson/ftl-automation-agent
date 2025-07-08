@@ -75,7 +75,7 @@ some software.  Work collaboratively with them to plan how to deploy this
 system.  You are given some tools to help in your planning.
 
 Use the planning_input_tool to ask for additional information.
-Call the plan_tool to send the plan to the user.
+Call the submit_plan_tool to send the plan to the user.
 Do not use the print function on the plan.
 Use the approval_tool to ask for the user for approval of the plan.
 Do not enact the plan. Another agent will take care of that.
@@ -259,10 +259,10 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
         full_prompt = (
             PLANNING_PROMPT
             + prompt
-            + "\nCall complete() when the customer is satified with the plan."
+            + "\nCall complete() when the customer is satisfied with the plan."
         )
 
-        tools = ['complete', 'impossible', 'planning_input_tool', 'approval_tool', 'plan_tool']
+        tools = ['complete', 'planning_input_tool', 'approval_tool', 'submit_plan_tool']
 
         agent = make_agent(
             tools=[get_tool(tool_classes, t, context.state) for t in tools],
@@ -842,7 +842,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
         with gr.Tab("Planning"):
             with gr.Row():
 
-                with gr.Column():
+                with gr.Column(scale=1):
                     planning_chatbot = gr.Chatbot(
                         placeholder="<strong>FTL Planning</strong><br>What do you want to build today?",
                         label="FTL Planning",
@@ -859,8 +859,11 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
                         ),
                         save_history=False,
                     )
-                with gr.Column(scale=0):
+
+                with gr.Column(scale=1):
+
                     planning_question_input = gr.Textbox(visible=False)
+                    plan_markdown = gr.Textbox(visible=False)
                     approval_input = gr.Textbox(visible=False)
 
                     @gr.render(inputs=planning_question_input)
@@ -941,6 +944,22 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
                         fn=update_planning_questions, outputs=planning_question_input
                     )
 
+                    @gr.render(inputs=plan_markdown)
+                    def render_plan(request: gr.Request, plan, *args, **kwargs):
+                        print("render_plan")
+                        print(plan)
+                        print(args)
+                        print(kwargs)
+                        if plan:
+                            gr.Markdown(plan)
+
+
+                    def update_plan(request: gr.Request):
+                        return user_contexts[request.session_hash].state["plan"]
+
+                    gr.Timer(1).tick(
+                        fn=update_plan, outputs=plan_markdown
+                    )
                     @gr.render(inputs=approval_input)
                     def render_approval_input(request: gr.Request, *args, **kwargs):
 
@@ -980,10 +999,12 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
                                             label=q,
                                         )
                                     )
-                            answer_button = gr.Button("Submit", scale=0)
+                            approve_button = gr.Button("Approve", scale=0)
+                            deny_button = gr.Button("Deny", scale=0)
                             clear_button = gr.Button("Clear", scale=0)
 
-                            def answer_questions(request: gr.Request, *args, **kwargs):
+                            def approve_plan(request: gr.Request, *args, **kwargs):
+
                                 print(args)
                                 print(kwargs)
                                 persistent_sessions[request.session_hash][
@@ -995,12 +1016,12 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
                                 ):
                                     user_contexts[request.session_hash].state[
                                         "planning_approvals"
-                                    ][question] = answer
+                                    ][question] = f"yes"
                                     persistent_sessions[request.session_hash][
                                         "planning_approvals"
-                                    ][question] = answer
+                                    ][question] = f"yes"
 
-                            def clear_questions(request: gr.Request, *args, **kwargs):
+                            def clear_approvals(request: gr.Request, *args, **kwargs):
                                 persistent_sessions[request.session_hash][
                                     "planning_approvals"
                                 ] = {}
@@ -1008,9 +1029,8 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
                                     "planning_approval_questions"
                                 ] = []
 
-                            answer_button.click(answer_questions, inputs=inputs)
-
-                            clear_button.click(clear_questions, inputs=inputs)
+                            approve_button.click(approve_plan, inputs=inputs)
+                            clear_button.click(clear_approvals, inputs=inputs)
 
                     def update_planning_approval_questions(request: gr.Request):
                         return user_contexts[request.session_hash].state["planning_approval_questions"]

@@ -124,12 +124,12 @@ class PlanningUserInputTool(Tool):
         super().__init__(*args, **kwargs)
 
     def forward(self, question):
-        if question not in self.state["questions"]:
-            self.state["questions"].append(question)
-        while question not in self.state["user_input"]:
+        if question not in self.state["planning_questions"]:
+            self.state["planning_questions"].append(question)
+        while question not in self.state["planning_input"]:
             print(f'Waiting on user input for question: {question}')
             time.sleep(1)
-        return self.state["user_input"][question]
+        return self.state["planning_input"][question]
 
 
 class ApprovalTool(Tool):
@@ -146,16 +146,19 @@ class ApprovalTool(Tool):
         super().__init__(*args, **kwargs)
 
     def forward(self, question):
-        if question not in self.state["questions"]:
-            self.state["questions"].append(question)
-        while question not in self.state["user_input"]:
-            print(f'Waiting on user input for question: {question}')
+
+        if not self.state.get("plan"):
+            raise Exception("Not plan found.  Use the submit_plan_tool to send a plan to the user")
+        if question not in self.state["planning_approval_questions"]:
+            self.state["planning_approval_questions"].append(question)
+        while question not in self.state["planning_approvals"]:
+            print(f'Waiting on user input for planning approval question: {question}')
             time.sleep(1)
-        return self.state["user_input"][question]
+        return self.state["planning_approvals"][question]
 
 
-class PlanTool(Tool):
-    name = "plan_tool"
+class SubmitPlanTool(Tool):
+    name = "submit_plan_tool"
     description = "Sends the plan to the user. The plan should be in markdown format."
     inputs = {
         "plan": {"type": "string", "description": "The plan to send to the user."}
@@ -179,5 +182,5 @@ TOOLS = {
     "gradio_input_tool": GradioUserInputTool,
     "planning_input_tool": PlanningUserInputTool,
     "approval_tool": ApprovalTool,
-    "plan_tool": PlanTool,
+    "submit_plan_tool": SubmitPlanTool,
 }
