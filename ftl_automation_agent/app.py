@@ -75,8 +75,10 @@ some software.  Work collaboratively with them to plan how to deploy this
 system.  You are given some tools to help in your planning.
 
 Use the planning_input_tool to ask for additional information.
-Use the plan_tool to propose a plan to the user.
+Call the plan_tool to send the plan to the user.
+Do not use the print function on the plan.
 Use the approval_tool to ask for the user for approval of the plan.
+Do not enact the plan. Another agent will take care of that.
 
 """
 
@@ -397,6 +399,11 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
             "questions": [],
             "workspace": workspace,
             "secrets": SecretsView(secrets),
+            "planning_questions": [],
+            "planning_input": {},
+            "planning_approval_questions": [],
+            "planning_approvals": {},
+            "plan": None,
         }
         user_contexts[request.session_hash] = Bunch(
             state=state,
@@ -703,13 +710,13 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
                     current_question_input = gr.Textbox(visible=False)
 
                     @gr.render(inputs=current_question_input)
-                    def render_form(request: gr.Request, *args, **kwargs):
+                    def render_current_question_input(request: gr.Request, *args, **kwargs):
 
                         if request.session_hash not in user_contexts:
                             return
 
                         context = user_contexts[request.session_hash]
-                        print("render_form")
+                        print("render_current_question_input")
                         print(args)
                         print(kwargs)
                         if persistent_sessions[request.session_hash].get("user_input"):
@@ -854,7 +861,163 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
                     )
                 with gr.Column(scale=0):
                     planning_question_input = gr.Textbox(visible=False)
+                    approval_input = gr.Textbox(visible=False)
 
+                    @gr.render(inputs=planning_question_input)
+                    def render_planning_question_input(request: gr.Request, *args, **kwargs):
+
+                        if request.session_hash not in user_contexts:
+                            return
+
+                        context = user_contexts[request.session_hash]
+                        print("render_planning_question_input")
+                        print(args)
+                        print(kwargs)
+                        if persistent_sessions[request.session_hash].get("planning_input"):
+                            if "planning_questions" not in context.state:
+                                context.state["planning_questions"] = []
+                            for question, answer in persistent_sessions[
+                                request.session_hash
+                            ]["planning_input"].items():
+                                if question not in context.state["planning_questions"]:
+                                    context.state["planning_questions"].append(question)
+                                context.state["planning_input"][question] = answer
+                        print(context.state["planning_questions"])
+                        print(context.state["planning_input"])
+                        if context.state["planning_questions"]:
+                            gr.Markdown("### Please answer the following questions:")
+                            inputs = []
+                            for q in context.state["planning_questions"]:
+                                if q in context.state["planning_input"]:
+                                    inputs.append(
+                                        gr.Textbox(
+                                            label=q,
+                                            value=context.state["planning_input"][q],
+                                            interactive=False,
+                                        )
+                                    )
+                                else:
+                                    inputs.append(
+                                        gr.Textbox(
+                                            label=q,
+                                        )
+                                    )
+                            answer_button = gr.Button("Submit", scale=0)
+                            clear_button = gr.Button("Clear", scale=0)
+
+                            def answer_questions(request: gr.Request, *args, **kwargs):
+                                print(args)
+                                print(kwargs)
+                                persistent_sessions[request.session_hash][
+                                    "planning_input"
+                                ] = {}
+                                for question, answer in zip(
+                                    context.state["planning_questions"],
+                                    args,
+                                ):
+                                    user_contexts[request.session_hash].state[
+                                        "planning_input"
+                                    ][question] = answer
+                                    persistent_sessions[request.session_hash][
+                                        "planning_input"
+                                    ][question] = answer
+
+                            def clear_questions(request: gr.Request, *args, **kwargs):
+                                persistent_sessions[request.session_hash][
+                                    "planning_input"
+                                ] = {}
+                                user_contexts[request.session_hash].state[
+                                    "planning_questions"
+                                ] = []
+
+                            answer_button.click(answer_questions, inputs=inputs)
+
+                            clear_button.click(clear_questions, inputs=inputs)
+
+                    def update_planning_questions(request: gr.Request):
+                        return user_contexts[request.session_hash].state["planning_questions"]
+
+                    gr.Timer(1).tick(
+                        fn=update_planning_questions, outputs=planning_question_input
+                    )
+
+                    @gr.render(inputs=approval_input)
+                    def render_approval_input(request: gr.Request, *args, **kwargs):
+
+                        if request.session_hash not in user_contexts:
+                            return
+
+                        context = user_contexts[request.session_hash]
+                        print("render_approval_input")
+                        print(args)
+                        print(kwargs)
+                        if persistent_sessions[request.session_hash].get("planning_approvals"):
+                            if "planning_approval_questions" not in context.state:
+                                context.state["planning_approval_questions"] = []
+                            for question, answer in persistent_sessions[
+                                request.session_hash
+                            ]["planning_approvals"].items():
+                                if question not in context.state["planning_approval_questions"]:
+                                    context.state["planning_approval_questions"].append(question)
+                                context.state["planning_approvals"][question] = answer
+                        print(context.state["planning_approval_questions"])
+                        print(context.state["planning_approvals"])
+                        if context.state["planning_approval_questions"]:
+                            gr.Markdown("### Please answer the following questions:")
+                            inputs = []
+                            for q in context.state["planning_approval_questions"]:
+                                if q in context.state["planning_approvals"]:
+                                    inputs.append(
+                                        gr.Textbox(
+                                            label=q,
+                                            value=context.state["planning_approvals"][q],
+                                            interactive=False,
+                                        )
+                                    )
+                                else:
+                                    inputs.append(
+                                        gr.Textbox(
+                                            label=q,
+                                        )
+                                    )
+                            answer_button = gr.Button("Submit", scale=0)
+                            clear_button = gr.Button("Clear", scale=0)
+
+                            def answer_questions(request: gr.Request, *args, **kwargs):
+                                print(args)
+                                print(kwargs)
+                                persistent_sessions[request.session_hash][
+                                    "planning_approvals"
+                                ] = {}
+                                for question, answer in zip(
+                                    context.state["planning_approval_questions"],
+                                    args,
+                                ):
+                                    user_contexts[request.session_hash].state[
+                                        "planning_approvals"
+                                    ][question] = answer
+                                    persistent_sessions[request.session_hash][
+                                        "planning_approvals"
+                                    ][question] = answer
+
+                            def clear_questions(request: gr.Request, *args, **kwargs):
+                                persistent_sessions[request.session_hash][
+                                    "planning_approvals"
+                                ] = {}
+                                user_contexts[request.session_hash].state[
+                                    "planning_approval_questions"
+                                ] = []
+
+                            answer_button.click(answer_questions, inputs=inputs)
+
+                            clear_button.click(clear_questions, inputs=inputs)
+
+                    def update_planning_approval_questions(request: gr.Request):
+                        return user_contexts[request.session_hash].state["planning_approval_questions"]
+
+                    gr.Timer(1).tick(
+                        fn=update_planning_approval_questions, outputs=approval_input
+                    )
 
     def render_secrets():
 
