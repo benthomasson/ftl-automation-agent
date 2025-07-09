@@ -154,8 +154,12 @@ class ApprovalTool(Tool):
         while question not in self.state["planning_approvals"]:
             print(f'Waiting on user input for planning approval question: {question}')
             time.sleep(1)
-        return self.state["planning_approvals"][question]
+        result = self.state["planning_approvals"][question]
 
+        if "yes" in result.lower():
+            raise FinalAnswerException(result)
+        else:
+            return result
 
 class SubmitPlanTool(Tool):
     name = "submit_plan_tool"

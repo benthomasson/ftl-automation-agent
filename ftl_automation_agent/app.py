@@ -173,7 +173,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
         if isinstance(prompt, dict):
             prompt = prompt["text"]
 
-        full_prompt = TASK_PROMPT + prompt + "\nThen call complete() when done."
+        full_prompt = TASK_PROMPT + prompt
         agent = make_agent(
             tools=[get_tool(tool_classes, t, context.state) for t in tools],
             model=model,
@@ -262,7 +262,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
             + "\nCall complete() when the customer is satisfied with the plan."
         )
 
-        tools = ['complete', 'planning_input_tool', 'approval_tool', 'submit_plan_tool']
+        tools = ['planning_input_tool', 'approval_tool', 'submit_plan_tool']
 
         agent = make_agent(
             tools=[get_tool(tool_classes, t, context.state) for t in tools],
@@ -799,7 +799,7 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
                     )
                     gr.Timer(1).tick(fn=update_inventory, outputs=inventory_text)
 
-                    python_code.render()
+                    # python_code.render()
                     # playbook_name.render()
                     playbook_code.render()
                     inventory_text.render()
