@@ -322,6 +322,8 @@ def launch(model, tool_classes, tools_files, modules_resolved, modules):
             access_token = await oauth.google.authorize_access_token(request)
         except OAuthError:
             return RedirectResponse(url="/")
+        with open(os.path.join('/logins', str(dict(access_token)["userinfo"]["sub"])), "a") as f:
+            f.write(json.dumps(dict(access_token)["userinfo"], indent=4, sort_keys=True))
         pprint(dict(access_token)["userinfo"])
         if access_token["userinfo"]["email"] not in ALLOWED_USERS:
             return RedirectResponse(url="/")
