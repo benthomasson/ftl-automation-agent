@@ -22,6 +22,7 @@ from .default_tools import TOOLS
 from .prompts import SOLVE_PROBLEM
 from .tools import get_tool, load_tools
 from .util import resolve_modules_path_or_package
+from .secret import Secret
 
 console = Console()
 
@@ -96,7 +97,7 @@ def main(
     }
     for secret in secrets:
         name, _, value = secret.partition("=")
-        state["secrets"][name] = value
+        state["secrets"][name] = Secret(value)
 
     if problem_file is not None and problem is not None:
         raise Exception('problem and problem-file are mutually exclusive options')
