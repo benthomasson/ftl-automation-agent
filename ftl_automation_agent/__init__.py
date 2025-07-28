@@ -17,6 +17,7 @@ from ftl_automation_agent.local_python_executor import FinalAnswerException
 from .default_tools import TOOLS
 from .tools import get_tool, load_tools
 from .util import resolve_modules_path_or_package
+from .secret import Secret
 
 from rich.progress import Progress, TextColumn, BarColumn, TaskProgressColumn, TimeElapsedColumn
 from textual.widgets import RichLog
@@ -46,7 +47,7 @@ class FTL:
 
 
 @contextmanager
-def automation(tools_files, tools, inventory, modules, user_input=None, log=None, sync=True, **kwargs):
+def automation(tools_files, tools, inventory, modules, user_input=None, log=None, sync=True, secrets=None):
     tool_classes = {}
     tool_classes.update(TOOLS)
     for tf in tools_files:
@@ -98,8 +99,11 @@ def automation(tools_files, tools, inventory, modules, user_input=None, log=None
         "log": log,
         "console": console,
         "questions": [],
+        "secrets": {},
     }
-    state.update(kwargs)
+
+    for secret in secrets:
+        state["secrets"][secret] = Secret(os.environ[secret])
 
     with Progress(
             TextColumn("[progress.description]{task.description}"),

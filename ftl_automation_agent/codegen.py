@@ -12,7 +12,7 @@ def generate_python_header(
     tools,
     inventory,
     modules,
-    extra_vars,
+    secrets,
     user_input,
 ):
 
@@ -32,9 +32,9 @@ def generate_python_header(
             f.write(f"inventory='{inventory}',\n")
             f.write(f"modules={modules},\n")
             f.write(f"user_input='{user_input}',\n")
-            for e in extra_vars:
-                e, _, _ = e.partition("=")
-                f.write(f"{e.lower()} = os.environ['{e.upper()}'],\n")
+            for secret in secrets:
+                secret, _, _ = secret.partition("=")
+                f.write(f"{secret.lower()} = os.environ['{secret.upper()}'],\n")
             f.write(") as ftl:\n\n")
             for t in tools:
                 f.write(f"    {t} = ftl.tools.{t}\n")

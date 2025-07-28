@@ -9,6 +9,7 @@ import yaml
 from rich.console import Console
 from smolagents.agent_types import AgentText
 
+
 from ftl_automation_agent.memory import ActionStep
 
 from .codegen import (generate_explain_action_step, generate_explain_header,
@@ -34,7 +35,7 @@ console = Console()
 @click.option("--model", "-m", default="ollama_chat/deepseek-r1:14b")
 @click.option("--modules", "-M", default=['modules'], multiple=True)
 @click.option("--inventory", default="inventory.yml")
-@click.option("--extra-vars", "-e", multiple=True)
+@click.option("--secrets", multiple=True)
 @click.option("--output", default="output-{time}.py")
 @click.option("--explain", default="output-{time}.txt")
 @click.option("--playbook", default="playbook-{time}.yml")
@@ -50,7 +51,7 @@ def main(
     model,
     modules,
     inventory,
-    extra_vars,
+    secrets,
     output,
     explain,
     playbook,
@@ -91,10 +92,11 @@ def main(
         "gate_cache": {},
         "log": None,
         "console": console,
+        "secrets": {},
     }
-    for extra_var in extra_vars:
-        name, _, value = extra_var.partition("=")
-        state[name] = value
+    for secret in secrets:
+        name, _, value = secret.partition("=")
+        state["secrets"][name] = value
 
     if problem_file is not None and problem is not None:
         raise Exception('problem and problem-file are mutually exclusive options')
@@ -112,7 +114,7 @@ def main(
         tools,
         inventory,
         modules,
-        extra_vars,
+        secrets,
         user_input,
     )
     generate_explain_header(explain, system_design, problem)
@@ -144,7 +146,7 @@ def main(
                 if o.tool_calls:
                     for call in o.tool_calls:
                         generate_python_tool_call(o, output, call)
-                    generate_playbook_task(playbook, o)
+                    generate_playbook_task(prompt, playbook, o, tool_classes)
                 generate_python_step_footer(output, o)
             elif isinstance(o, AgentText):
                 print(o.to_string())
