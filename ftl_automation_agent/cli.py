@@ -43,6 +43,7 @@ console = Console()
 @click.option("--info", multiple=True)
 @click.option("--user-input", default="user_input-{time}.yml")
 @click.option("--llm-api-base", default=None)
+@click.option("--workspace", default=".")
 def main(
     tools,
     tools_files,
@@ -59,6 +60,7 @@ def main(
     info,
     user_input,
     llm_api_base,
+    workspace,
 ):
 
     """A agent that solves a problem given a system design and a set of tools"""
@@ -95,9 +97,11 @@ def main(
         "log": None,
         "console": console,
         "secrets": {},
+        "workspace": os.path.abspath(workspace),
     }
-    for secret in secrets:
-        state["secrets"][secret] = Secret(secret, os.environ[secret])
+    if secrets:
+        for secret in secrets:
+            state["secrets"][secret] = Secret(secret, os.environ[secret])
 
     if problem_file is not None and problem is not None:
         raise Exception('problem and problem-file are mutually exclusive options')

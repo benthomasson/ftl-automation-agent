@@ -47,7 +47,7 @@ class FTL:
 
 
 @contextmanager
-def automation(tools_files, tools, inventory, modules, user_input=None, log=None, sync=True, secrets=None):
+def automation(tools_files, tools, inventory, modules, user_input=None, log=None, sync=True, secrets=None, workspace="."):
     tool_classes = {}
     tool_classes.update(TOOLS)
     for tf in tools_files:
@@ -101,10 +101,12 @@ def automation(tools_files, tools, inventory, modules, user_input=None, log=None
         "console": console,
         "questions": [],
         "secrets": {},
+        "workspace": os.path.abspath(workspace),
     }
 
-    for secret in secrets:
-        state["secrets"][secret] = Secret(secret, os.environ[secret])
+    if secrets:
+        for secret in secrets:
+            state["secrets"][secret] = Secret(secret, os.environ[secret])
 
     with Progress(
             TextColumn("[progress.description]{task.description}"),
