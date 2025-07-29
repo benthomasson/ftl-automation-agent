@@ -82,6 +82,7 @@ def automation(tools_files, tools, inventory, modules, user_input=None, log=None
 
     state = {
         "inventory": load_inventory(inventory),
+        "inventory_file": inventory,
         "modules": modules_resolved,
         "localhost": localhost,
         "gate_cache": gate_cache,
@@ -103,7 +104,7 @@ def automation(tools_files, tools, inventory, modules, user_input=None, log=None
     }
 
     for secret in secrets:
-        state["secrets"][secret] = Secret(os.environ[secret])
+        state["secrets"][secret] = Secret(secret, os.environ[secret])
 
     with Progress(
             TextColumn("[progress.description]{task.description}"),

@@ -85,6 +85,7 @@ def main(
 
     state = {
         "inventory": ftl.load_inventory(inventory),
+        "inventory_file": inventory,
         "modules": modules_resolved,
         "localhost": ftl.localhost,
         "user_input": {},
@@ -96,8 +97,7 @@ def main(
         "secrets": {},
     }
     for secret in secrets:
-        name, _, value = secret.partition("=")
-        state["secrets"][name] = Secret(value)
+        state["secrets"][secret] = Secret(secret, os.environ[secret])
 
     if problem_file is not None and problem is not None:
         raise Exception('problem and problem-file are mutually exclusive options')
