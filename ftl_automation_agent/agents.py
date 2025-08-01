@@ -286,29 +286,20 @@ class MultiStepAgent:
         the LLM.
         """
         messages = self.memory.system_prompt.to_messages(summary_mode=summary_mode)
-        
-        # Mark system prompt for caching (if using Claude)
-        if use_prompt_caching and messages and self._is_claude_model():
-            if isinstance(messages[0]["content"], list):
-                # Add cache_control to the last content block
-                messages[0]["content"][-1]["cache_control"] = {"type": "ephemeral"}
-            else:
-                # Convert to list format and add caching
-                messages[0]["content"] = [
-                    {"type": "text", "text": messages[0]["content"], 
-                     "cache_control": {"type": "ephemeral"}}
-                ]
-        
+
         # Add conversation history
         for memory_step in self.memory.steps:
             step_messages = memory_step.to_messages(summary_mode=summary_mode)
             messages.extend(step_messages)
-        
-        # Cache conversation history if it's long enough
-        if use_prompt_caching and len(messages) > 5 and self._is_claude_model():
-            # Mark the last message before new input for caching
-            self._add_cache_control_to_message(messages[-2])
-        
+
+        # Cache conversation history
+        if use_prompt_caching and self._is_claude_model():
+            for message in messages[:1]:
+                self._add_cache_control_to_message(message)
+
+            for message in messages[-1:]:
+                self._add_cache_control_to_message(message)
+
         return messages
 
     def _is_claude_model(self) -> bool:
@@ -318,6 +309,7 @@ class MultiStepAgent:
 
     def _add_cache_control_to_message(self, message: Dict):
         """Add cache control to a message"""
+        print('Add cache control to a message')
         if isinstance(message["content"], str):
             message["content"] = [
                 {"type": "text", "text": message["content"], 

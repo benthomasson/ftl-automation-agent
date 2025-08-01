@@ -11,13 +11,6 @@ def create_model(model_id, context=8192, llm_api_base=None, enable_prompt_cachin
         "api_base": llm_api_base,
         "temperature": 0,
     }
-    
-    # Add Anthropic-specific caching configuration
-    if enable_prompt_caching and model_id.startswith("claude"):
-        model_kwargs["extra_headers"] = {
-            "anthropic-beta": "prompt-caching-2024-07-31"
-        }
-    
     return LiteLLMModel(**model_kwargs)
 
 

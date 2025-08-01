@@ -9,7 +9,6 @@ import yaml
 from rich.console import Console
 from smolagents.agent_types import AgentText
 
-
 from ftl_automation_agent.memory import ActionStep
 
 from .codegen import (generate_explain_action_step, generate_explain_header,
