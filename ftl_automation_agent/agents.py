@@ -278,7 +278,6 @@ class MultiStepAgent:
     def write_memory_to_messages(
         self,
         summary_mode: Optional[bool] = False,
-        use_prompt_caching: bool = False,
     ) -> List[Dict[str, str]]:
         """
         Reads past llm_outputs, actions, and observations or errors from the memory into a series of messages
@@ -293,7 +292,7 @@ class MultiStepAgent:
             messages.extend(step_messages)
 
         # Cache conversation history
-        if use_prompt_caching and self._is_claude_model():
+        if self.enable_prompt_caching and self._is_claude_model():
             for message in messages[:1]:
                 self._add_cache_control_to_message(message)
 
@@ -1105,10 +1104,7 @@ class ToolCallingAgent(MultiStepAgent):
         Perform one step in the ReAct framework: the agent thinks, acts, and observes the result.
         Returns None if the step is not final.
         """
-        use_caching = (hasattr(self, 'enable_prompt_caching') and 
-                       self.enable_prompt_caching and self._is_claude_model())
-        
-        memory_messages = self.write_memory_to_messages(use_prompt_caching=use_caching)
+        memory_messages = self.write_memory_to_messages()
 
         self.input_messages = memory_messages
 
@@ -1221,7 +1217,6 @@ class CodeAgent(MultiStepAgent):
         self.authorized_imports = list(set(BASE_BUILTIN_MODULES) | set(self.additional_authorized_imports))
         self.use_e2b_executor = use_e2b_executor
         self.max_print_outputs_length = max_print_outputs_length
-        self.enable_prompt_caching = enable_prompt_caching
         prompt_templates = prompt_templates or yaml.safe_load(
             importlib.resources.files("smolagents.prompts").joinpath("code_agent.yaml").read_text()
         )
@@ -1231,6 +1226,7 @@ class CodeAgent(MultiStepAgent):
             prompt_templates=prompt_templates,
             grammar=grammar,
             planning_interval=planning_interval,
+            enable_prompt_caching=enable_prompt_caching,
             **kwargs,
         )
         if "*" in self.additional_authorized_imports:
@@ -1278,10 +1274,7 @@ class CodeAgent(MultiStepAgent):
         Perform one step in the ReAct framework: the agent thinks, acts, and observes the result.
         Returns None if the step is not final.
         """
-        use_caching = (hasattr(self, 'enable_prompt_caching') and 
-                       self.enable_prompt_caching and self._is_claude_model())
-        
-        memory_messages = self.write_memory_to_messages(use_prompt_caching=use_caching)
+        memory_messages = self.write_memory_to_messages()
 
         self.input_messages = memory_messages.copy()
 
