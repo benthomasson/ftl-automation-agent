@@ -45,6 +45,8 @@ console = Console()
 @click.option("--llm-api-base", default=None)
 @click.option("--workspace", default=".")
 @click.option("--max-steps", default=10)
+@click.option("--enable-prompt-caching", is_flag=True, default=False, 
+              help="Enable Anthropic prompt caching for Claude models")
 def main(
     tools,
     tools_files,
@@ -63,6 +65,7 @@ def main(
     llm_api_base,
     workspace,
     max_steps,
+    enable_prompt_caching,
 ):
 
     """A agent that solves a problem given a system design and a set of tools"""
@@ -75,7 +78,7 @@ def main(
     tool_classes.update(TOOLS)
     for tf in tools_files:
         tool_classes.update(load_tools(tf))
-    model = create_model(model, llm_api_base=llm_api_base)
+    model = create_model(model, llm_api_base=llm_api_base, enable_prompt_caching=enable_prompt_caching)
     if not os.path.exists(inventory):
         with open(inventory, "w") as f:
             f.write(yaml.dump({}))
@@ -147,6 +150,7 @@ def main(
             model=model,
             problem_statement=prompt,
             max_steps=max_steps,
+            enable_prompt_caching=enable_prompt_caching,
         ):
             if isinstance(o, ActionStep):
                 generate_explain_action_step(explain, o)

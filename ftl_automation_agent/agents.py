@@ -209,6 +209,7 @@ class MultiStepAgent:
         description: Optional[str] = None,
         provide_run_summary: bool = False,
         final_answer_checks: Optional[List[Callable]] = None,
+        enable_prompt_caching: bool = False,
     ):
         if tool_parser is None:
             tool_parser = parse_json_tool_call
@@ -224,6 +225,7 @@ class MultiStepAgent:
         self.name = name
         self.description = description
         self.provide_run_summary = provide_run_summary
+        self.enable_prompt_caching = enable_prompt_caching
 
         self.managed_agents = {}
         if managed_agents is not None:
@@ -276,6 +278,7 @@ class MultiStepAgent:
     def write_memory_to_messages(
         self,
         summary_mode: Optional[bool] = False,
+        use_prompt_caching: bool = False,
     ) -> List[Dict[str, str]]:
         """
         Reads past llm_outputs, actions, and observations or errors from the memory into a series of messages
@@ -283,9 +286,45 @@ class MultiStepAgent:
         the LLM.
         """
         messages = self.memory.system_prompt.to_messages(summary_mode=summary_mode)
+        
+        # Mark system prompt for caching (if using Claude)
+        if use_prompt_caching and messages and self._is_claude_model():
+            if isinstance(messages[0]["content"], list):
+                # Add cache_control to the last content block
+                messages[0]["content"][-1]["cache_control"] = {"type": "ephemeral"}
+            else:
+                # Convert to list format and add caching
+                messages[0]["content"] = [
+                    {"type": "text", "text": messages[0]["content"], 
+                     "cache_control": {"type": "ephemeral"}}
+                ]
+        
+        # Add conversation history
         for memory_step in self.memory.steps:
-            messages.extend(memory_step.to_messages(summary_mode=summary_mode))
+            step_messages = memory_step.to_messages(summary_mode=summary_mode)
+            messages.extend(step_messages)
+        
+        # Cache conversation history if it's long enough
+        if use_prompt_caching and len(messages) > 5 and self._is_claude_model():
+            # Mark the last message before new input for caching
+            self._add_cache_control_to_message(messages[-2])
+        
         return messages
+
+    def _is_claude_model(self) -> bool:
+        """Check if current model is Claude"""
+        model_id = getattr(self.model, 'model_id', '')
+        return model_id.startswith('claude')
+
+    def _add_cache_control_to_message(self, message: Dict):
+        """Add cache control to a message"""
+        if isinstance(message["content"], str):
+            message["content"] = [
+                {"type": "text", "text": message["content"], 
+                 "cache_control": {"type": "ephemeral"}}
+            ]
+        elif isinstance(message["content"], list) and message["content"]:
+            message["content"][-1]["cache_control"] = {"type": "ephemeral"}
 
     def visualize(self):
         """Creates a rich tree visualization of the agent's structure."""
@@ -1047,6 +1086,7 @@ class ToolCallingAgent(MultiStepAgent):
         model: Callable[[List[Dict[str, str]]], ChatMessage],
         prompt_templates: Optional[PromptTemplates] = None,
         planning_interval: Optional[int] = None,
+        enable_prompt_caching: bool = False,
         **kwargs,
     ):
         prompt_templates = prompt_templates or yaml.safe_load(
@@ -1057,6 +1097,7 @@ class ToolCallingAgent(MultiStepAgent):
             model=model,
             prompt_templates=prompt_templates,
             planning_interval=planning_interval,
+            enable_prompt_caching=enable_prompt_caching,
             **kwargs,
         )
 
@@ -1072,7 +1113,10 @@ class ToolCallingAgent(MultiStepAgent):
         Perform one step in the ReAct framework: the agent thinks, acts, and observes the result.
         Returns None if the step is not final.
         """
-        memory_messages = self.write_memory_to_messages()
+        use_caching = (hasattr(self, 'enable_prompt_caching') and 
+                       self.enable_prompt_caching and self._is_claude_model())
+        
+        memory_messages = self.write_memory_to_messages(use_prompt_caching=use_caching)
 
         self.input_messages = memory_messages
 
@@ -1178,12 +1222,14 @@ class CodeAgent(MultiStepAgent):
         planning_interval: Optional[int] = None,
         use_e2b_executor: bool = False,
         max_print_outputs_length: Optional[int] = None,
+        enable_prompt_caching: bool = False,
         **kwargs,
     ):
         self.additional_authorized_imports = additional_authorized_imports if additional_authorized_imports else []
         self.authorized_imports = list(set(BASE_BUILTIN_MODULES) | set(self.additional_authorized_imports))
         self.use_e2b_executor = use_e2b_executor
         self.max_print_outputs_length = max_print_outputs_length
+        self.enable_prompt_caching = enable_prompt_caching
         prompt_templates = prompt_templates or yaml.safe_load(
             importlib.resources.files("smolagents.prompts").joinpath("code_agent.yaml").read_text()
         )
@@ -1240,7 +1286,10 @@ class CodeAgent(MultiStepAgent):
         Perform one step in the ReAct framework: the agent thinks, acts, and observes the result.
         Returns None if the step is not final.
         """
-        memory_messages = self.write_memory_to_messages()
+        use_caching = (hasattr(self, 'enable_prompt_caching') and 
+                       self.enable_prompt_caching and self._is_claude_model())
+        
+        memory_messages = self.write_memory_to_messages(use_prompt_caching=use_caching)
 
         self.input_messages = memory_messages.copy()
 
