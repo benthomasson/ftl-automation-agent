@@ -44,6 +44,7 @@ console = Console()
 @click.option("--user-input", default="user_input-{time}.yml")
 @click.option("--llm-api-base", default=None)
 @click.option("--workspace", default=".")
+@click.option("--max-steps", default=10)
 def main(
     tools,
     tools_files,
@@ -61,6 +62,7 @@ def main(
     user_input,
     llm_api_base,
     workspace,
+    max_steps,
 ):
 
     """A agent that solves a problem given a system design and a set of tools"""
@@ -144,6 +146,7 @@ def main(
             tools=[get_tool(tool_classes, t, state) for t in tools],
             model=model,
             problem_statement=prompt,
+            max_steps=max_steps,
         ):
             if isinstance(o, ActionStep):
                 generate_explain_action_step(explain, o)

@@ -14,7 +14,7 @@ def create_model(model_id, context=8192, llm_api_base=None):
     )
 
 
-def make_agent(tools, model):
+def make_agent(tools, model, max_steps=10):
     prompt_templates = yaml.safe_load(
         importlib.resources.files("ftl_automation_agent.prompts").joinpath("code_agent.yaml").read_text()
     )
@@ -23,13 +23,13 @@ def make_agent(tools, model):
         model=model,
         verbosity_level=4,
         prompt_templates=prompt_templates,
-        max_steps=10,
+        max_steps=max_steps,
     )
     return agent
 
 
-def run_agent(tools, model, problem_statement):
-    agent = make_agent(tools, model)
+def run_agent(tools, model, problem_statement, max_steps=10):
+    agent = make_agent(tools, model, max_steps=max_steps)
     return agent.run(problem_statement, stream=True)
 
 
